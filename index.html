@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebXR Piper Controller</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1020;
+      --panel: #121933;
+      --panel-2: #1a2447;
+      --text: #e7ecff;
+      --muted: #9fb0e3;
+      --ok: #51d88a;
+      --warn: #ffcc66;
+      --bad: #ff6b6b;
+      --accent: #78a6ff;
+      --border: rgba(255,255,255,0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #0a0f1e 0%, #0f1730 100%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+    }
+
+    .card {
+      background: rgba(18, 25, 51, 0.94);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.28);
+    }
+
+    h1, h2 {
+      margin: 0 0 10px 0;
+      font-weight: 700;
+    }
+
+    h1 { font-size: 28px; }
+    h2 { font-size: 18px; }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    button, input {
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 12px 14px;
+      font-size: 14px;
+    }
+
+    button {
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    input {
+      min-width: 320px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 10px 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--warn);
+      box-shadow: 0 0 12px rgba(255, 204, 102, 0.45);
+    }
+
+    .dot.ok { background: var(--ok); box-shadow: 0 0 12px rgba(81, 216, 138, 0.45); }
+    .dot.bad { background: var(--bad); box-shadow: 0 0 12px rgba(255, 107, 107, 0.45); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #dce6ff;
+      min-height: 220px;
+      overflow: auto;
+    }
+
+    .hint {
+      font-size: 13px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>WebXR Piper Controller</h1>
+      <p>
+        Open this page in the Quest browser, connect to your Python backend with WebSocket,
+        enter VR, then use the <strong>right controller pose</strong> as the teleop source.
+        Buttons are sent too, so you can map them to gripper and reset on the backend.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom: 12px;">
+        <input id="wsUrl" value="ws://172.22.205.37:8765" />
+        <button id="connectBtn">Connect WebSocket</button>
+        <button id="enterVrBtn">Enter VR</button>
+        <button id="setRefBtn">Set Reference</button>
+      </div>
+      <div class="row">
+        <div class="pill"><span id="wsDot" class="dot"></span> <span id="wsStatus">WebSocket: disconnected</span></div>
+        <div class="pill"><span id="xrDot" class="dot"></span> <span id="xrStatus">XR: idle</span></div>
+        <div class="pill"><span id="refDot" class="dot"></span> <span id="refStatus">Reference: not set</span></div>
+      </div>
+      <div class="row" style="margin-top: 12px;">
+        <span class="hint">
+          Suggested mapping on the backend: right controller pose → relative transform; A/B or trigger buttons → gripper/reset.
+        </span>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Current packet</h2>
+        <pre id="packetView">Waiting for XR frame...</pre>
+      </div>
+      <div class="card">
+        <h2>Instructions</h2>
+        <pre>
+1. Start your Python WebSocket server on the Linux machine.
+2. Replace the WebSocket URL above if needed.
+3. Open this page in the Quest browser.
+4. Tap “Connect WebSocket”.
+5. Tap “Enter VR”.
+6. Tap “Set Reference” while holding the controller in your neutral pose.
+7. Move the right controller. The page will stream controller pose and button state.
+
+Recommended backend logic:
+- Save reference when receive set_reference = true
+- Compute T_rel = inv(T_ref) @ T_now
+- Remap controller axes to robot axes
+- Use buttons for gripper/open close and reset
+        </pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let ws = null;
+    let xrSession = null;
+    let xrRefSpace = null;
+    let xrViewerSpace = null;
+    let gl = null;
+
+    let rightControllerSpace = null;
+    let leftControllerSpace = null;
+
+    let frameCounter = 0;
+    let lastSentTime = 0;
+    const SEND_INTERVAL_MS = 50; // ~20 Hz
+
+    let pendingSetReference = false;
+
+    const wsUrlInput = document.getElementById('wsUrl');
+    const connectBtn = document.getElementById('connectBtn');
+    const enterVrBtn = document.getElementById('enterVrBtn');
+    const setRefBtn = document.getElementById('setRefBtn');
+
+    const wsDot = document.getElementById('wsDot');
+    const wsStatus = document.getElementById('wsStatus');
+    const xrDot = document.getElementById('xrDot');
+    const xrStatus = document.getElementById('xrStatus');
+    const refDot = document.getElementById('refDot');
+    const refStatus = document.getElementById('refStatus');
+    const packetView = document.getElementById('packetView');
+
+    function setPill(dotEl, textEl, status, text) {
+      dotEl.classList.remove('ok', 'bad');
+      if (status === 'ok') dotEl.classList.add('ok');
+      if (status === 'bad') dotEl.classList.add('bad');
+      textEl.textContent = text;
+    }
+
+    function matrixFromTransform(transform) {
+      const m = new Float32Array(16);
+      const q = transform.orientation;
+      const p = transform.position;
+
+      const x = q.x, y = q.y, z = q.z, w = q.w;
+      const x2 = x + x, y2 = y + y, z2 = z + z;
+      const xx = x * x2, xy = x * y2, xz = x * z2;
+      const yy = y * y2, yz = y * z2, zz = z * z2;
+      const wx = w * x2, wy = w * y2, wz = w * z2;
+
+      m[0] = 1 - (yy + zz);
+      m[1] = xy + wz;
+      m[2] = xz - wy;
+      m[3] = 0;
+
+      m[4] = xy - wz;
+      m[5] = 1 - (xx + zz);
+      m[6] = yz + wx;
+      m[7] = 0;
+
+      m[8] = xz + wy;
+      m[9] = yz - wx;
+      m[10] = 1 - (xx + yy);
+      m[11] = 0;
+
+      m[12] = p.x;
+      m[13] = p.y;
+      m[14] = p.z;
+      m[15] = 1;
+      return Array.from(m);
+    }
+
+    function gamepadButtonsToObject(gamepad) {
+      if (!gamepad || !gamepad.buttons) return {};
+      const out = {};
+      gamepad.buttons.forEach((btn, i) => {
+        out[`b${i}`] = {
+          pressed: !!btn.pressed,
+          touched: !!btn.touched,
+          value: Number(btn.value || 0),
+        };
+      });
+      return out;
+    }
+
+    function gamepadAxesToArray(gamepad) {
+      if (!gamepad || !gamepad.axes) return [];
+      return Array.from(gamepad.axes, x => Number(x));
+    }
+
+    function sendPacket(packet) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify(packet));
+    }
+
+    function connectWebSocket() {
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
+
+      ws = new WebSocket(wsUrlInput.value.trim());
+      setPill(wsDot, wsStatus, '', 'WebSocket: connecting...');
+
+      ws.onopen = () => {
+        setPill(wsDot, wsStatus, 'ok', 'WebSocket: connected');
+      };
+
+      ws.onclose = () => {
+        setPill(wsDot, wsStatus, 'bad', 'WebSocket: disconnected');
+      };
+
+      ws.onerror = () => {
+        setPill(wsDot, wsStatus, 'bad', 'WebSocket: error');
+      };
+
+      ws.onmessage = (event) => {
+        console.log('Server:', event.data);
+      };
+    }
+
+    async function startXR() {
+      if (!navigator.xr) {
+        alert('WebXR is not available in this browser. Open this page in the Quest browser.');
+        return;
+      }
+
+      const supported = await navigator.xr.isSessionSupported('immersive-vr');
+      if (!supported) {
+        alert('immersive-vr is not supported.');
+        return;
+      }
+
+      xrSession = await navigator.xr.requestSession('immersive-vr', {
+        optionalFeatures: ['local-floor', 'bounded-floor']
+      });
+
+      const canvas = document.createElement('canvas');
+      gl = canvas.getContext('webgl', { xrCompatible: true });
+      await gl.makeXRCompatible();
+      xrSession.updateRenderState({ baseLayer: new XRWebGLLayer(xrSession, gl) });
+
+      xrRefSpace = await xrSession.requestReferenceSpace('local-floor');
+      xrViewerSpace = await xrSession.requestReferenceSpace('viewer');
+
+      xrSession.addEventListener('end', () => {
+        xrSession = null;
+        xrRefSpace = null;
+        rightControllerSpace = null;
+        leftControllerSpace = null;
+        setPill(xrDot, xrStatus, 'bad', 'XR: ended');
+      });
+
+      xrSession.inputSources.forEach((inputSource) => {
+        if (inputSource.handedness === 'right' && inputSource.gripSpace) {
+          rightControllerSpace = inputSource.gripSpace;
+        }
+        if (inputSource.handedness === 'left' && inputSource.gripSpace) {
+          leftControllerSpace = inputSource.gripSpace;
+        }
+      });
+
+      xrSession.addEventListener('inputsourceschange', (event) => {
+        for (const inputSource of xrSession.inputSources) {
+          if (inputSource.handedness === 'right' && inputSource.gripSpace) {
+            rightControllerSpace = inputSource.gripSpace;
+          }
+          if (inputSource.handedness === 'left' && inputSource.gripSpace) {
+            leftControllerSpace = inputSource.gripSpace;
+          }
+        }
+      });
+
+      setPill(xrDot, xrStatus, 'ok', 'XR: running');
+      xrSession.requestAnimationFrame(onXRFrame);
+    }
+
+    function onXRFrame(time, frame) {
+      if (!xrSession) return;
+      xrSession.requestAnimationFrame(onXRFrame);
+      frameCounter += 1;
+
+      const nowMs = performance.now();
+      if (nowMs - lastSentTime < SEND_INTERVAL_MS) {
+        return;
+      }
+      lastSentTime = nowMs;
+
+      const packet = {
+        type: 'xr_controller_state',
+        timestamp_ms: nowMs,
+        frame_counter: frameCounter,
+        set_reference: pendingSetReference,
+        right: null,
+        left: null,
+      };
+
+      for (const inputSource of xrSession.inputSources) {
+        const gripSpace = inputSource.gripSpace;
+        if (!gripSpace) continue;
+
+        const pose = frame.getPose(gripSpace, xrRefSpace);
+        if (!pose) continue;
+
+        const state = {
+          handedness: inputSource.handedness,
+          pose: {
+            position: {
+              x: pose.transform.position.x,
+              y: pose.transform.position.y,
+              z: pose.transform.position.z,
+            },
+            orientation: {
+              x: pose.transform.orientation.x,
+              y: pose.transform.orientation.y,
+              z: pose.transform.orientation.z,
+              w: pose.transform.orientation.w,
+            },
+            matrix: matrixFromTransform(pose.transform),
+          },
+          gamepad: {
+            axes: gamepadAxesToArray(inputSource.gamepad),
+            buttons: gamepadButtonsToObject(inputSource.gamepad),
+          },
+          profiles: inputSource.profiles || [],
+        };
+
+        if (inputSource.handedness === 'right') packet.right = state;
+        if (inputSource.handedness === 'left') packet.left = state;
+      }
+
+      packetView.textContent = JSON.stringify(packet, null, 2);
+      sendPacket(packet);
+
+      if (pendingSetReference) {
+        pendingSetReference = false;
+        setPill(refDot, refStatus, 'ok', 'Reference: sent to backend');
+      }
+    }
+
+    connectBtn.addEventListener('click', connectWebSocket);
+    enterVrBtn.addEventListener('click', startXR);
+    setRefBtn.addEventListener('click', () => {
+      pendingSetReference = true;
+      setPill(refDot, refStatus, '', 'Reference: pending on next XR frame');
+    });
+
+    if (!('xr' in navigator)) {
+      setPill(xrDot, xrStatus, 'bad', 'XR: WebXR not available here');
+    }
+  </script>
+</body>
+</html>
