@@ -241,6 +241,17 @@ Recommended backend logic:
       textEl.textContent = text;
     }
   
+    function sendDebug(tag, message, extra = {}) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({
+        type: 'frontend_debug',
+        timestamp_ms: performance.now(),
+        tag,
+        message,
+        extra,
+      }));
+    }
+  
     function matrixFromTransform(transform) {
       const m = new Float32Array(16);
       const q = transform.orientation;
@@ -307,6 +318,7 @@ Recommended backend logic:
   
       ws.onopen = () => {
         setPill(wsDot, wsStatus, 'ok', 'WebSocket: connected');
+        sendDebug('ws_open', 'WebSocket connected on frontend');
       };
   
       ws.onclose = (event) => {
@@ -437,9 +449,11 @@ Recommended backend logic:
         xrSession = null;
         xrRefSpace = null;
         setPill(xrDot, xrStatus, 'bad', 'XR: ended');
+        sendDebug('xr_end', 'XR session ended on frontend');
       });
   
       setPill(xrDot, xrStatus, 'ok', `XR: running (${XR_MODE})`);
+      sendDebug('xr_start', 'XR session started on frontend', { mode: XR_MODE });
       xrSession.requestAnimationFrame(onXRFrame);
     }
   
@@ -484,19 +498,19 @@ Recommended backend logic:
       for (const inputSource of xrSession.inputSources) {
         let pose = null;
         let usedSpace = null;
-      
+  
         if (inputSource.gripSpace) {
           pose = frame.getPose(inputSource.gripSpace, xrRefSpace);
           usedSpace = 'grip';
         }
-      
+  
         if (!pose && inputSource.targetRaySpace) {
           pose = frame.getPose(inputSource.targetRaySpace, xrRefSpace);
           usedSpace = 'targetRay';
         }
-      
+  
         if (!pose) continue;
-      
+  
         const state = {
           handedness: inputSource.handedness,
           pose: {
@@ -520,7 +534,7 @@ Recommended backend logic:
           },
           profiles: inputSource.profiles || [],
         };
-      
+  
         if (inputSource.handedness === 'right') {
           packet.right = state;
           rightPose = pose;
@@ -530,11 +544,14 @@ Recommended backend logic:
           leftPose = pose;
         }
       }
-
+  
       let refWasActuallySent = false;
       if (pendingSetReference && packet.right?.pose?.matrix) {
         refMatrix = packet.right.pose.matrix.slice();
         refWasActuallySent = true;
+        sendDebug('set_reference_success', 'Reference set on frontend', {
+          space: packet.right.pose.space
+        });
       }
   
       if (viewerPose) {
@@ -555,13 +572,7 @@ Recommended backend logic:
           }
   
           if (refMatrix) {
-            drawPoint(
-              view,
-              refMatrix[12],
-              refMatrix[13],
-              refMatrix[14],
-              [0.30, 1.00, 0.35, 1.0] // green
-            );
+            drawPoint(view, refMatrix[12], refMatrix[13], refMatrix[14], [0.30, 1.00, 0.35, 1.0]); // green
           }
         }
       }
@@ -569,26 +580,38 @@ Recommended backend logic:
       const nowMs = performance.now();
       if (nowMs - lastSentTime >= SEND_INTERVAL_MS) {
         lastSentTime = nowMs;
+  
+        if (!packet.right) {
+          sendDebug('right_not_tracked', 'Right controller not tracked in this XR frame');
+        }
+  
+        if (pendingSetReference && !refWasActuallySent) {
+          sendDebug('set_reference_wait', 'Set reference requested, waiting for right controller tracking');
+        }
+  
         sendPacket(packet);
   
         const rp = packet.right?.pose?.position;
+        const rspace = packet.right?.pose?.space || 'none';
         const text = rp
           ? `XR packet
   right.position = (${rp.x.toFixed(3)}, ${rp.y.toFixed(3)}, ${rp.z.toFixed(3)})
+  right.space = ${rspace}
   ref = ${refMatrix ? 'set' : 'not set'}
   ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}`
           : `XR packet
   right controller not tracked
+  right.space = none
   ref = ${refMatrix ? 'set' : 'not set'}
   ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}`;
   
         packetView.textContent = text + '\n\n' + JSON.stringify(packet, null, 2);
       }
   
-      if (pendingSetReference) {
+      if (refWasActuallySent) {
         pendingSetReference = false;
         setPill(refDot, refStatus, 'ok', 'Reference: sent to backend');
-      }else if (pendingSetReference) {
+      } else if (pendingSetReference) {
         setPill(refDot, refStatus, '', 'Reference: waiting for right controller tracking');
       }
     }
@@ -598,6 +621,7 @@ Recommended backend logic:
     setRefBtn.addEventListener('click', () => {
       pendingSetReference = true;
       setPill(refDot, refStatus, '', 'Reference: pending on next XR frame');
+      sendDebug('set_reference_click', 'Set Reference button clicked');
     });
   
     if (!('xr' in navigator)) {
