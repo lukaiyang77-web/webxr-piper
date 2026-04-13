@@ -303,12 +303,16 @@ Recommended backend logic:
         setPill(wsDot, wsStatus, 'ok', 'WebSocket: connected');
       };
 
-      ws.onclose = () => {
-        setPill(wsDot, wsStatus, 'bad', 'WebSocket: disconnected');
+      ws.onclose = (event) => {
+        console.error('WebSocket close:', event);
+        setPill(wsDot, wsStatus, 'bad', `WebSocket: closed code=${event.code}`);
+        packetView.textContent = `WebSocket closed. code=${event.code} reason=${event.reason || '(empty)'}`;
       };
 
-      ws.onerror = () => {
+      ws.onerror = (event) => {
+        console.error('WebSocket error:', event);
         setPill(wsDot, wsStatus, 'bad', 'WebSocket: error');
+        packetView.textContent = 'WebSocket error. Check URL / browser security policy.';
       };
 
       ws.onmessage = (event) => {
