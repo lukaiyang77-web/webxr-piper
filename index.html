@@ -203,23 +203,21 @@ Recommended backend logic:
     let ws = null;
     let xrSession = null;
     let xrRefSpace = null;
-    let xrViewerSpace = null;
     let gl = null;
-
-    let rightControllerSpace = null;
-    let leftControllerSpace = null;
-
+  
     let frameCounter = 0;
     let lastSentTime = 0;
     const SEND_INTERVAL_MS = 50; // ~20 Hz
-
+    const XR_MODE = 'immersive-ar';
+  
     let pendingSetReference = false;
-
+    let refMatrix = null;
+  
     const wsUrlInput = document.getElementById('wsUrl');
     const connectBtn = document.getElementById('connectBtn');
     const enterVrBtn = document.getElementById('enterVrBtn');
     const setRefBtn = document.getElementById('setRefBtn');
-
+  
     const wsDot = document.getElementById('wsDot');
     const wsStatus = document.getElementById('wsStatus');
     const xrDot = document.getElementById('xrDot');
@@ -227,47 +225,55 @@ Recommended backend logic:
     const refDot = document.getElementById('refDot');
     const refStatus = document.getElementById('refStatus');
     const packetView = document.getElementById('packetView');
-
+  
+    let xrProgram = null;
+    let xrPointBuffer = null;
+    let attribPosition = null;
+    let uModel = null;
+    let uView = null;
+    let uProjection = null;
+    let uColor = null;
+  
     function setPill(dotEl, textEl, status, text) {
       dotEl.classList.remove('ok', 'bad');
       if (status === 'ok') dotEl.classList.add('ok');
       if (status === 'bad') dotEl.classList.add('bad');
       textEl.textContent = text;
     }
-
+  
     function matrixFromTransform(transform) {
       const m = new Float32Array(16);
       const q = transform.orientation;
       const p = transform.position;
-
+  
       const x = q.x, y = q.y, z = q.z, w = q.w;
       const x2 = x + x, y2 = y + y, z2 = z + z;
       const xx = x * x2, xy = x * y2, xz = x * z2;
       const yy = y * y2, yz = y * z2, zz = z * z2;
       const wx = w * x2, wy = w * y2, wz = w * z2;
-
+  
       m[0] = 1 - (yy + zz);
       m[1] = xy + wz;
       m[2] = xz - wy;
       m[3] = 0;
-
+  
       m[4] = xy - wz;
       m[5] = 1 - (xx + zz);
       m[6] = yz + wx;
       m[7] = 0;
-
+  
       m[8] = xz + wy;
       m[9] = yz - wx;
       m[10] = 1 - (xx + yy);
       m[11] = 0;
-
+  
       m[12] = p.x;
       m[13] = p.y;
       m[14] = p.z;
       m[15] = 1;
       return Array.from(m);
     }
-
+  
     function gamepadButtonsToObject(gamepad) {
       if (!gamepad || !gamepad.buttons) return {};
       const out = {};
@@ -280,129 +286,208 @@ Recommended backend logic:
       });
       return out;
     }
-
+  
     function gamepadAxesToArray(gamepad) {
       if (!gamepad || !gamepad.axes) return [];
       return Array.from(gamepad.axes, x => Number(x));
     }
-
+  
     function sendPacket(packet) {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
       ws.send(JSON.stringify(packet));
     }
-
+  
     function connectWebSocket() {
       if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
         return;
       }
-
+  
       ws = new WebSocket(wsUrlInput.value.trim());
       setPill(wsDot, wsStatus, '', 'WebSocket: connecting...');
-
+  
       ws.onopen = () => {
         setPill(wsDot, wsStatus, 'ok', 'WebSocket: connected');
       };
-
+  
       ws.onclose = (event) => {
         console.error('WebSocket close:', event);
         setPill(wsDot, wsStatus, 'bad', `WebSocket: closed code=${event.code}`);
         packetView.textContent = `WebSocket closed. code=${event.code} reason=${event.reason || '(empty)'}`;
       };
-
+  
       ws.onerror = (event) => {
         console.error('WebSocket error:', event);
         setPill(wsDot, wsStatus, 'bad', 'WebSocket: error');
         packetView.textContent = 'WebSocket error. Check URL / browser security policy.';
       };
-
+  
       ws.onmessage = (event) => {
         console.log('Server:', event.data);
       };
     }
-
+  
+    function createShader(gl, type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+  
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    }
+  
+    function createProgram(gl, vsSource, fsSource) {
+      const vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
+      const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+      if (!vs || !fs) return null;
+  
+      const program = gl.createProgram();
+      gl.attachShader(program, vs);
+      gl.attachShader(program, fs);
+      gl.linkProgram(program);
+  
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error(gl.getProgramInfoLog(program));
+        gl.deleteProgram(program);
+        return null;
+      }
+      return program;
+    }
+  
+    function initXRRendering() {
+      const vsSource = `
+        attribute vec3 aPosition;
+        uniform mat4 uModel;
+        uniform mat4 uView;
+        uniform mat4 uProjection;
+  
+        void main() {
+          gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
+          gl_PointSize = 22.0;
+        }
+      `;
+  
+      const fsSource = `
+        precision mediump float;
+        uniform vec4 uColor;
+  
+        void main() {
+          vec2 c = gl_PointCoord - vec2(0.5);
+          if (dot(c, c) > 0.25) discard;
+          gl_FragColor = uColor;
+        }
+      `;
+  
+      xrProgram = createProgram(gl, vsSource, fsSource);
+      if (!xrProgram) {
+        throw new Error('Failed to create XR shader program');
+      }
+  
+      attribPosition = gl.getAttribLocation(xrProgram, 'aPosition');
+      uModel = gl.getUniformLocation(xrProgram, 'uModel');
+      uView = gl.getUniformLocation(xrProgram, 'uView');
+      uProjection = gl.getUniformLocation(xrProgram, 'uProjection');
+      uColor = gl.getUniformLocation(xrProgram, 'uColor');
+  
+      xrPointBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, xrPointBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 0]), gl.STATIC_DRAW);
+    }
+  
+    function makeTranslationMatrix(x, y, z) {
+      return new Float32Array([
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        x, y, z, 1,
+      ]);
+    }
+  
     async function startXR() {
       if (!navigator.xr) {
         alert('WebXR is not available in this browser. Open this page in the Quest browser.');
         return;
       }
-
-      const supported = await navigator.xr.isSessionSupported('immersive-vr');
+  
+      const supported = await navigator.xr.isSessionSupported(XR_MODE);
       if (!supported) {
-        alert('immersive-vr is not supported.');
+        alert(`${XR_MODE} is not supported in this browser.`);
         return;
       }
-
-      xrSession = await navigator.xr.requestSession('immersive-ar', {
+  
+      xrSession = await navigator.xr.requestSession(XR_MODE, {
         optionalFeatures: ['local-floor', 'bounded-floor']
       });
-
+  
       const canvas = document.createElement('canvas');
-      gl = canvas.getContext('webgl', { xrCompatible: true });
+      gl = canvas.getContext('webgl', { xrCompatible: true, alpha: true });
       await gl.makeXRCompatible();
-      xrSession.updateRenderState({ baseLayer: new XRWebGLLayer(xrSession, gl) });
-
+  
+      xrSession.updateRenderState({
+        baseLayer: new XRWebGLLayer(xrSession, gl, { alpha: true })
+      });
+  
       xrRefSpace = await xrSession.requestReferenceSpace('local-floor');
-      xrViewerSpace = await xrSession.requestReferenceSpace('viewer');
-
+      initXRRendering();
+  
       xrSession.addEventListener('end', () => {
         xrSession = null;
         xrRefSpace = null;
-        rightControllerSpace = null;
-        leftControllerSpace = null;
         setPill(xrDot, xrStatus, 'bad', 'XR: ended');
       });
-
-      xrSession.inputSources.forEach((inputSource) => {
-        if (inputSource.handedness === 'right' && inputSource.gripSpace) {
-          rightControllerSpace = inputSource.gripSpace;
-        }
-        if (inputSource.handedness === 'left' && inputSource.gripSpace) {
-          leftControllerSpace = inputSource.gripSpace;
-        }
-      });
-
-      xrSession.addEventListener('inputsourceschange', (event) => {
-        for (const inputSource of xrSession.inputSources) {
-          if (inputSource.handedness === 'right' && inputSource.gripSpace) {
-            rightControllerSpace = inputSource.gripSpace;
-          }
-          if (inputSource.handedness === 'left' && inputSource.gripSpace) {
-            leftControllerSpace = inputSource.gripSpace;
-          }
-        }
-      });
-
-      setPill(xrDot, xrStatus, 'ok', 'XR: running');
+  
+      setPill(xrDot, xrStatus, 'ok', `XR: running (${XR_MODE})`);
       xrSession.requestAnimationFrame(onXRFrame);
     }
-
+  
+    function drawPoint(view, x, y, z, color) {
+      const baseLayer = xrSession.renderState.baseLayer;
+      const viewport = baseLayer.getViewport(view);
+  
+      gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+      gl.uniformMatrix4fv(uView, false, view.transform.inverse.matrix);
+      gl.uniformMatrix4fv(uProjection, false, view.projectionMatrix);
+      gl.uniformMatrix4fv(uModel, false, makeTranslationMatrix(x, y, z));
+      gl.uniform4f(uColor, color[0], color[1], color[2], color[3]);
+      gl.drawArrays(gl.POINTS, 0, 1);
+    }
+  
     function onXRFrame(time, frame) {
       if (!xrSession) return;
       xrSession.requestAnimationFrame(onXRFrame);
       frameCounter += 1;
-
-      const nowMs = performance.now();
-      if (nowMs - lastSentTime < SEND_INTERVAL_MS) {
-        return;
-      }
-      lastSentTime = nowMs;
-
+  
+      const baseLayer = xrSession.renderState.baseLayer;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, baseLayer.framebuffer);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.clearColor(0.0, 0.0, 0.0, 0.0);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  
+      const viewerPose = frame.getViewerPose(xrRefSpace);
+  
       const packet = {
         type: 'xr_controller_state',
-        timestamp_ms: nowMs,
+        timestamp_ms: performance.now(),
         frame_counter: frameCounter,
         set_reference: pendingSetReference,
         right: null,
         left: null,
       };
-
+  
+      let rightPose = null;
+      let leftPose = null;
+  
       for (const inputSource of xrSession.inputSources) {
         const gripSpace = inputSource.gripSpace;
         if (!gripSpace) continue;
-
+  
         const pose = frame.getPose(gripSpace, xrRefSpace);
         if (!pose) continue;
-
+  
         const state = {
           handedness: inputSource.handedness,
           pose: {
@@ -425,27 +510,82 @@ Recommended backend logic:
           },
           profiles: inputSource.profiles || [],
         };
-
-        if (inputSource.handedness === 'right') packet.right = state;
-        if (inputSource.handedness === 'left') packet.left = state;
+  
+        if (inputSource.handedness === 'right') {
+          packet.right = state;
+          rightPose = pose;
+        }
+        if (inputSource.handedness === 'left') {
+          packet.left = state;
+          leftPose = pose;
+        }
       }
-
-      packetView.textContent = JSON.stringify(packet, null, 2);
-      sendPacket(packet);
-
+  
+      if (pendingSetReference && packet.right?.pose?.matrix) {
+        refMatrix = packet.right.pose.matrix.slice();
+      }
+  
+      if (viewerPose) {
+        gl.useProgram(xrProgram);
+        gl.bindBuffer(gl.ARRAY_BUFFER, xrPointBuffer);
+        gl.enableVertexAttribArray(attribPosition);
+        gl.vertexAttribPointer(attribPosition, 3, gl.FLOAT, false, 0, 0);
+  
+        for (const view of viewerPose.views) {
+          if (rightPose) {
+            const p = rightPose.transform.position;
+            drawPoint(view, p.x, p.y, p.z, [0.20, 0.85, 1.00, 1.0]); // blue
+          }
+  
+          if (leftPose) {
+            const p = leftPose.transform.position;
+            drawPoint(view, p.x, p.y, p.z, [1.00, 0.55, 0.20, 1.0]); // orange
+          }
+  
+          if (refMatrix) {
+            drawPoint(
+              view,
+              refMatrix[12],
+              refMatrix[13],
+              refMatrix[14],
+              [0.30, 1.00, 0.35, 1.0] // green
+            );
+          }
+        }
+      }
+  
+      const nowMs = performance.now();
+      if (nowMs - lastSentTime >= SEND_INTERVAL_MS) {
+        lastSentTime = nowMs;
+        sendPacket(packet);
+  
+        const rp = packet.right?.pose?.position;
+        const text = rp
+          ? `XR packet
+  right.position = (${rp.x.toFixed(3)}, ${rp.y.toFixed(3)}, ${rp.z.toFixed(3)})
+  ref = ${refMatrix ? 'set' : 'not set'}
+  ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}`
+          : `XR packet
+  right controller not tracked
+  ref = ${refMatrix ? 'set' : 'not set'}
+  ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}`;
+  
+        packetView.textContent = text + '\n\n' + JSON.stringify(packet, null, 2);
+      }
+  
       if (pendingSetReference) {
         pendingSetReference = false;
         setPill(refDot, refStatus, 'ok', 'Reference: sent to backend');
       }
     }
-
+  
     connectBtn.addEventListener('click', connectWebSocket);
     enterVrBtn.addEventListener('click', startXR);
     setRefBtn.addEventListener('click', () => {
       pendingSetReference = true;
       setPill(refDot, refStatus, '', 'Reference: pending on next XR frame');
     });
-
+  
     if (!('xr' in navigator)) {
       setPill(xrDot, xrStatus, 'bad', 'XR: WebXR not available here');
     }
