@@ -143,7 +143,26 @@
     }
   </style>
 </head>
+
 <body>
+  <div id="xrHud" style="
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    width: 420px;
+    max-height: 45vh;
+    overflow: auto;
+    z-index: 9999;
+    background: rgba(0,0,0,0.78);
+    color: #00ff9c;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 12px;
+    padding: 12px;
+    font: 12px/1.5 monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  ">XR HUD waiting...</div>
   <div class="wrap">
     <div class="card">
       <h1>WebXR Piper Controller</h1>
@@ -213,7 +232,7 @@ Recommended backend logic:
     let pendingSetReference = false;
     let refMatrix = null;
     let lastB5Pressed = false;
-  
+    const xrHud = document.getElementById('xrHud');
     const wsUrlInput = document.getElementById('wsUrl');
     const connectBtn = document.getElementById('connectBtn');
     const enterVrBtn = document.getElementById('enterVrBtn');
@@ -458,6 +477,51 @@ Recommended backend logic:
       xrSession.requestAnimationFrame(onXRFrame);
     }
   
+    function updateXrHud(packet, extra = {}) {
+      if (!xrHud) return;
+
+      const rp = packet?.right?.pose?.position || null;
+      const rspace = packet?.right?.pose?.space || 'none';
+      const buttons = packet?.right?.gamepad?.buttons || {};
+      const pressed = Object.entries(buttons)
+        .filter(([_, v]) => v && v.pressed)
+        .map(([k]) => k);
+
+      const inputSummary = (xrSession?.inputSources || []).map((s, i) =>
+        `source[${i}] handedness=${s.handedness} grip=${!!s.gripSpace} targetRay=${!!s.targetRaySpace} gamepad=${!!s.gamepad}`
+      ).join('\n') || 'no input sources';
+
+      let refText = 'ref.position = N/A';
+      let deltaText = 'delta = N/A';
+
+      if (rp && refPosition) {
+        refText = `ref.position = (${refPosition.x.toFixed(3)}, ${refPosition.y.toFixed(3)}, ${refPosition.z.toFixed(3)})`;
+        deltaText =
+          `delta = (` +
+          `${(rp.x - refPosition.x).toFixed(4)}, ` +
+          `${(rp.y - refPosition.y).toFixed(4)}, ` +
+          `${(rp.z - refPosition.z).toFixed(4)})`;
+      }
+
+      const rightText = rp
+        ? `right.position = (${rp.x.toFixed(3)}, ${rp.y.toFixed(3)}, ${rp.z.toFixed(3)})`
+        : 'right controller not tracked';
+
+      xrHud.textContent =
+      `XR HUD
+      ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}
+      xr = ${xrSession ? 'running' : 'idle'}
+      right.space = ${rspace}
+      ${rightText}
+      ${refText}
+      ${deltaText}
+      pressed = [${pressed.join(', ')}]
+
+      ${inputSummary}
+
+      extra = ${JSON.stringify(extra)}`;
+    }
+
     function drawPoint(view, x, y, z, color) {
       const baseLayer = xrSession.renderState.baseLayer;
       const viewport = baseLayer.getViewport(view);
@@ -569,6 +633,11 @@ Recommended backend logic:
         refReadyThisFrame = true;
       }
   
+      updateXrHud(packet, {
+        pendingSetReference,
+        hasRefMatrix: !!refMatrix,
+      });
+
       if (viewerPose) {
         gl.useProgram(xrProgram);
         gl.bindBuffer(gl.ARRAY_BUFFER, xrPointBuffer);
@@ -623,6 +692,10 @@ Recommended backend logic:
             `\ndelta = (${(rp.x - refPosition.x).toFixed(4)}, ${(rp.y - refPosition.y).toFixed(4)}, ${(rp.z - refPosition.z).toFixed(4)})`;
         }
         
+        const sourceSummaryText = xrSession.inputSources.map((s, i) =>
+          `source[${i}] handedness=${s.handedness} grip=${!!s.gripSpace} targetRay=${!!s.targetRaySpace} gamepad=${!!s.gamepad}`
+        ).join('\n');
+
         const text = rp
           ? `XR packet
         right.position = (${rp.x.toFixed(3)}, ${rp.y.toFixed(3)}, ${rp.z.toFixed(3)})
@@ -635,7 +708,7 @@ Recommended backend logic:
         ref = ${refMatrix ? 'set' : 'not set'}
         ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}`;
       
-        packetView.textContent = text + '\n\n' + JSON.stringify(packet, null, 2);
+        packetView.textContent = text + '\n\n' + sourceSummaryText + '\n\n' + JSON.stringify(packet, null, 2);
       }
   
       if (refPacketActuallySent) {
