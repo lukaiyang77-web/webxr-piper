@@ -418,6 +418,32 @@ Recommended backend logic:
         x, y, z, 1,
       ]);
     }
+
+    function multiplyMat4(a, b) {
+      const out = new Float32Array(16);
+      for (let col = 0; col < 4; col++) {
+        for (let row = 0; row < 4; row++) {
+          out[col * 4 + row] =
+            a[0 * 4 + row] * b[col * 4 + 0] +
+            a[1 * 4 + row] * b[col * 4 + 1] +
+            a[2 * 4 + row] * b[col * 4 + 2] +
+            a[3 * 4 + row] * b[col * 4 + 3];
+        }
+      }
+      return out;
+    }
+
+    function drawHudPoint(view, localX, localY, localZ, color) {
+      // local position is relative to the viewer/head
+      const hudLocal = makeTranslationMatrix(localX, localY, localZ);
+      const hudWorld = multiplyMat4(view.transform.matrix, hudLocal);
+
+      gl.uniformMatrix4fv(uView, false, view.transform.inverse.matrix);
+      gl.uniformMatrix4fv(uProjection, false, view.projectionMatrix);
+      gl.uniformMatrix4fv(uModel, false, hudWorld);
+      gl.uniform4f(uColor, color[0], color[1], color[2], color[3]);
+      gl.drawArrays(gl.POINTS, 0, 1);
+    }
   
     async function startXR() {
       if (!navigator.xr) {
@@ -589,6 +615,38 @@ Recommended backend logic:
           if (refMatrix) {
             drawPoint(view, refMatrix[12], refMatrix[13], refMatrix[14], [0.30, 1.00, 0.35, 1.0]); // green
           }
+
+          const wsOpen = !!(ws && ws.readyState === WebSocket.OPEN);
+          const rightTracked = !!packet.right;
+          const refPending = !!pendingSetReference;
+          const refSet = !!refMatrix;
+
+          // Tracking ball:
+          // purple = tracked, dark red = not tracked
+          const trackingColor = rightTracked
+            ? [0.72, 0.38, 1.00, 1.0]   // purple
+            : [0.35, 0.08, 0.08, 1.0];  // dark red
+
+          // Reference ball:
+          // white = set, yellow = pending, dark red = not set
+          let refColor = [0.35, 0.08, 0.08, 1.0]; // dark red default
+          if (refPending) {
+            refColor = [1.00, 0.88, 0.20, 1.0];   // yellow
+          } else if (refSet) {
+            refColor = [1.00, 1.00, 1.00, 1.0];   // white
+          }
+
+          // WebSocket ball:
+          // pink = connected, dark red = disconnected
+          const wsColor = wsOpen
+            ? [1.00, 0.35, 0.72, 1.0]   // pink
+            : [0.35, 0.08, 0.08, 1.0];  // dark red
+
+          // Draw three HUD balls in a row
+          // x: left->right, y: up, z: forward from head
+          drawHudPoint(view, -0.18,  0.12, -0.45, trackingColor); // left
+          drawHudPoint(view, -0.12,  0.12, -0.45, refColor);      // middle
+          drawHudPoint(view, -0.06,  0.12, -0.45, wsColor);       // right
         }
       }
   
