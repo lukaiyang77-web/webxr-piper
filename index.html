@@ -143,29 +143,10 @@
     }
   </style>
 </head>
-
 <body>
-  <div id="xrHud" style="
-    position: fixed;
-    right: 12px;
-    bottom: 12px;
-    width: 420px;
-    max-height: 45vh;
-    overflow: auto;
-    z-index: 9999;
-    background: rgba(0,0,0,0.78);
-    color: #00ff9c;
-    border: 1px solid rgba(255,255,255,0.18);
-    border-radius: 12px;
-    padding: 12px;
-    font: 12px/1.5 monospace;
-    white-space: pre-wrap;
-    word-break: break-word;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
-  ">XR HUD waiting...</div>
   <div class="wrap">
     <div class="card">
-      <h1>WebXR Piper Controller V4 TEST</h1>
+      <h1>WebXR Piper Controller</h1>
       <p>
         Open this page in the Quest browser, connect to your Python backend with WebSocket,
         enter VR, then use the <strong>right controller pose</strong> as the teleop source.
@@ -232,7 +213,7 @@ Recommended backend logic:
     let pendingSetReference = false;
     let refMatrix = null;
     let lastB5Pressed = false;
-    const xrHud = document.getElementById('xrHud');
+  
     const wsUrlInput = document.getElementById('wsUrl');
     const connectBtn = document.getElementById('connectBtn');
     const enterVrBtn = document.getElementById('enterVrBtn');
@@ -439,116 +420,44 @@ Recommended backend logic:
     }
   
     async function startXR() {
-      try {
-        packetView.textContent = 'startXR: begin';
-    
-        if (!navigator.xr) {
-          packetView.textContent = 'startXR: navigator.xr not available';
-          alert('WebXR is not available in this browser. Open this page in the Quest browser.');
-          return;
-        }
-    
-        packetView.textContent = 'startXR: checking session support...';
-        const supported = await navigator.xr.isSessionSupported(XR_MODE);
-        packetView.textContent = `startXR: isSessionSupported(${XR_MODE}) = ${supported}`;
-    
-        if (!supported) {
-          alert(`${XR_MODE} is not supported in this browser.`);
-          return;
-        }
-    
-        packetView.textContent = 'startXR: requesting session...';
-        xrSession = await navigator.xr.requestSession(XR_MODE, {
-          optionalFeatures: ['local-floor', 'bounded-floor']
-        });
-    
-        packetView.textContent = 'startXR: session created, creating canvas...';
-        const canvas = document.createElement('canvas');
-    
-        gl = canvas.getContext('webgl', { xrCompatible: true, alpha: true });
-        if (!gl) {
-          packetView.textContent = 'startXR ERROR: failed to get webgl context';
-          return;
-        }
-    
-        packetView.textContent = 'startXR: makeXRCompatible...';
-        await gl.makeXRCompatible();
-    
-        packetView.textContent = 'startXR: creating XRWebGLLayer...';
-        xrSession.updateRenderState({
-          baseLayer: new XRWebGLLayer(xrSession, gl, { alpha: true })
-        });
-    
-        packetView.textContent = 'startXR: requesting reference space...';
-        xrRefSpace = await xrSession.requestReferenceSpace('local-floor');
-    
-        packetView.textContent = 'startXR: initXRRendering...';
-        initXRRendering();
-    
-        xrSession.addEventListener('end', () => {
-          xrSession = null;
-          xrRefSpace = null;
-          setPill(xrDot, xrStatus, 'bad', 'XR: ended');
-          sendDebug('xr_end', 'XR session ended on frontend');
-          packetView.textContent = 'XR ended';
-        });
-    
-        setPill(xrDot, xrStatus, 'ok', `XR: running (${XR_MODE})`);
-        sendDebug('xr_start', 'XR session started on frontend', { mode: XR_MODE });
-    
-        packetView.textContent = 'startXR: requesting first XR frame...';
-        xrSession.requestAnimationFrame(onXRFrame);
-      } catch (e) {
-        console.error('startXR failed:', e);
-        packetView.textContent = 'startXR EXCEPTION: ' + (e?.stack || e?.message || e);
+      if (!navigator.xr) {
+        alert('WebXR is not available in this browser. Open this page in the Quest browser.');
+        return;
       }
+  
+      const supported = await navigator.xr.isSessionSupported(XR_MODE);
+      if (!supported) {
+        alert(`${XR_MODE} is not supported in this browser.`);
+        return;
+      }
+  
+      xrSession = await navigator.xr.requestSession(XR_MODE, {
+        optionalFeatures: ['local-floor', 'bounded-floor']
+      });
+  
+      const canvas = document.createElement('canvas');
+      gl = canvas.getContext('webgl', { xrCompatible: true, alpha: true });
+      await gl.makeXRCompatible();
+  
+      xrSession.updateRenderState({
+        baseLayer: new XRWebGLLayer(xrSession, gl, { alpha: true })
+      });
+  
+      xrRefSpace = await xrSession.requestReferenceSpace('local-floor');
+      initXRRendering();
+  
+      xrSession.addEventListener('end', () => {
+        xrSession = null;
+        xrRefSpace = null;
+        setPill(xrDot, xrStatus, 'bad', 'XR: ended');
+        sendDebug('xr_end', 'XR session ended on frontend');
+      });
+  
+      setPill(xrDot, xrStatus, 'ok', `XR: running (${XR_MODE})`);
+      sendDebug('xr_start', 'XR session started on frontend', { mode: XR_MODE });
+      xrSession.requestAnimationFrame(onXRFrame);
     }
   
-    function updateXrHud(packet, extra = {}) {
-      if (!xrHud) return;
-
-      const rp = packet?.right?.pose?.position || null;
-      const rspace = packet?.right?.pose?.space || 'none';
-      const buttons = packet?.right?.gamepad?.buttons || {};
-      const pressed = Object.entries(buttons)
-        .filter(([_, v]) => v && v.pressed)
-        .map(([k]) => k);
-
-      const inputSummary = (xrSession?.inputSources || []).map((s, i) =>
-        `source[${i}] handedness=${s.handedness} grip=${!!s.gripSpace} targetRay=${!!s.targetRaySpace} gamepad=${!!s.gamepad}`
-      ).join('\n') || 'no input sources';
-
-      let refText = 'ref.position = N/A';
-      let deltaText = 'delta = N/A';
-
-      if (rp && refPosition) {
-        refText = `ref.position = (${refPosition.x.toFixed(3)}, ${refPosition.y.toFixed(3)}, ${refPosition.z.toFixed(3)})`;
-        deltaText =
-          `delta = (` +
-          `${(rp.x - refPosition.x).toFixed(4)}, ` +
-          `${(rp.y - refPosition.y).toFixed(4)}, ` +
-          `${(rp.z - refPosition.z).toFixed(4)})`;
-      }
-
-      const rightText = rp
-        ? `right.position = (${rp.x.toFixed(3)}, ${rp.y.toFixed(3)}, ${rp.z.toFixed(3)})`
-        : 'right controller not tracked';
-
-      xrHud.textContent =
-      `XR HUD
-      ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}
-      xr = ${xrSession ? 'running' : 'idle'}
-      right.space = ${rspace}
-      ${rightText}
-      ${refText}
-      ${deltaText}
-      pressed = [${pressed.join(', ')}]
-
-      ${inputSummary}
-
-      extra = ${JSON.stringify(extra)}`;
-    }
-
     function drawPoint(view, x, y, z, color) {
       const baseLayer = xrSession.renderState.baseLayer;
       const viewport = baseLayer.getViewport(view);
@@ -562,18 +471,7 @@ Recommended backend logic:
     }
   
     function onXRFrame(time, frame) {
-      if (!xrSession) {
-        packetView.textContent = 'onXRFrame entered but xrSession is null';
-        return;
-      }
-    
-      const sourceSummaryText = (xrSession.inputSources || []).map((s, i) =>
-        `source[${i}] handedness=${s.handedness} grip=${!!s.gripSpace} targetRay=${!!s.targetRaySpace} gamepad=${!!s.gamepad}`
-      ).join('\n') || 'no input sources';
-      
-      packetView.textContent =
-        `onXRFrame entered, frameCounter=${frameCounter}\n\n` +
-        sourceSummaryText;
+      if (!xrSession) return;
       xrSession.requestAnimationFrame(onXRFrame);
       frameCounter += 1;
   
@@ -671,11 +569,6 @@ Recommended backend logic:
         refReadyThisFrame = true;
       }
   
-      updateXrHud(packet, {
-        pendingSetReference,
-        hasRefMatrix: !!refMatrix,
-      });
-
       if (viewerPose) {
         gl.useProgram(xrProgram);
         gl.bindBuffer(gl.ARRAY_BUFFER, xrPointBuffer);
@@ -730,10 +623,6 @@ Recommended backend logic:
             `\ndelta = (${(rp.x - refPosition.x).toFixed(4)}, ${(rp.y - refPosition.y).toFixed(4)}, ${(rp.z - refPosition.z).toFixed(4)})`;
         }
         
-        const sourceSummaryText = xrSession.inputSources.map((s, i) =>
-          `source[${i}] handedness=${s.handedness} grip=${!!s.gripSpace} targetRay=${!!s.targetRaySpace} gamepad=${!!s.gamepad}`
-        ).join('\n');
-
         const text = rp
           ? `XR packet
         right.position = (${rp.x.toFixed(3)}, ${rp.y.toFixed(3)}, ${rp.z.toFixed(3)})
@@ -746,7 +635,7 @@ Recommended backend logic:
         ref = ${refMatrix ? 'set' : 'not set'}
         ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}`;
       
-        packetView.textContent = text + '\n\n' + sourceSummaryText + '\n\n' + JSON.stringify(packet, null, 2);
+        packetView.textContent = text + '\n\n' + JSON.stringify(packet, null, 2);
       }
   
       if (refPacketActuallySent) {
@@ -758,16 +647,7 @@ Recommended backend logic:
     }
   
     connectBtn.addEventListener('click', connectWebSocket);
-    enterVrBtn.addEventListener('click', async () => {
-      packetView.textContent = 'Enter VR clicked...';
-      try {
-        await startXR();
-        packetView.textContent = 'startXR() finished, waiting for XR frames...';
-      } catch (e) {
-        console.error(e);
-        packetView.textContent = 'startXR() ERROR: ' + (e?.message || e);
-      }
-    });
+    enterVrBtn.addEventListener('click', startXR);
     setRefBtn.addEventListener('click', () => {
       pendingSetReference = true;
       setPill(refDot, refStatus, '', 'Reference: pending on next XR frame');
