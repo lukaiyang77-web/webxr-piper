@@ -439,42 +439,69 @@ Recommended backend logic:
     }
   
     async function startXR() {
-      if (!navigator.xr) {
-        alert('WebXR is not available in this browser. Open this page in the Quest browser.');
-        return;
+      try {
+        packetView.textContent = 'startXR: begin';
+    
+        if (!navigator.xr) {
+          packetView.textContent = 'startXR: navigator.xr not available';
+          alert('WebXR is not available in this browser. Open this page in the Quest browser.');
+          return;
+        }
+    
+        packetView.textContent = 'startXR: checking session support...';
+        const supported = await navigator.xr.isSessionSupported(XR_MODE);
+        packetView.textContent = `startXR: isSessionSupported(${XR_MODE}) = ${supported}`;
+    
+        if (!supported) {
+          alert(`${XR_MODE} is not supported in this browser.`);
+          return;
+        }
+    
+        packetView.textContent = 'startXR: requesting session...';
+        xrSession = await navigator.xr.requestSession(XR_MODE, {
+          optionalFeatures: ['local-floor', 'bounded-floor']
+        });
+    
+        packetView.textContent = 'startXR: session created, creating canvas...';
+        const canvas = document.createElement('canvas');
+    
+        gl = canvas.getContext('webgl', { xrCompatible: true, alpha: true });
+        if (!gl) {
+          packetView.textContent = 'startXR ERROR: failed to get webgl context';
+          return;
+        }
+    
+        packetView.textContent = 'startXR: makeXRCompatible...';
+        await gl.makeXRCompatible();
+    
+        packetView.textContent = 'startXR: creating XRWebGLLayer...';
+        xrSession.updateRenderState({
+          baseLayer: new XRWebGLLayer(xrSession, gl, { alpha: true })
+        });
+    
+        packetView.textContent = 'startXR: requesting reference space...';
+        xrRefSpace = await xrSession.requestReferenceSpace('local-floor');
+    
+        packetView.textContent = 'startXR: initXRRendering...';
+        initXRRendering();
+    
+        xrSession.addEventListener('end', () => {
+          xrSession = null;
+          xrRefSpace = null;
+          setPill(xrDot, xrStatus, 'bad', 'XR: ended');
+          sendDebug('xr_end', 'XR session ended on frontend');
+          packetView.textContent = 'XR ended';
+        });
+    
+        setPill(xrDot, xrStatus, 'ok', `XR: running (${XR_MODE})`);
+        sendDebug('xr_start', 'XR session started on frontend', { mode: XR_MODE });
+    
+        packetView.textContent = 'startXR: requesting first XR frame...';
+        xrSession.requestAnimationFrame(onXRFrame);
+      } catch (e) {
+        console.error('startXR failed:', e);
+        packetView.textContent = 'startXR EXCEPTION: ' + (e?.stack || e?.message || e);
       }
-  
-      const supported = await navigator.xr.isSessionSupported(XR_MODE);
-      if (!supported) {
-        alert(`${XR_MODE} is not supported in this browser.`);
-        return;
-      }
-  
-      xrSession = await navigator.xr.requestSession(XR_MODE, {
-        optionalFeatures: ['local-floor', 'bounded-floor']
-      });
-  
-      const canvas = document.createElement('canvas');
-      gl = canvas.getContext('webgl', { xrCompatible: true, alpha: true });
-      await gl.makeXRCompatible();
-  
-      xrSession.updateRenderState({
-        baseLayer: new XRWebGLLayer(xrSession, gl, { alpha: true })
-      });
-  
-      xrRefSpace = await xrSession.requestReferenceSpace('local-floor');
-      initXRRendering();
-  
-      xrSession.addEventListener('end', () => {
-        xrSession = null;
-        xrRefSpace = null;
-        setPill(xrDot, xrStatus, 'bad', 'XR: ended');
-        sendDebug('xr_end', 'XR session ended on frontend');
-      });
-  
-      setPill(xrDot, xrStatus, 'ok', `XR: running (${XR_MODE})`);
-      sendDebug('xr_start', 'XR session started on frontend', { mode: XR_MODE });
-      xrSession.requestAnimationFrame(onXRFrame);
     }
   
     function updateXrHud(packet, extra = {}) {
@@ -535,7 +562,12 @@ Recommended backend logic:
     }
   
     function onXRFrame(time, frame) {
-      if (!xrSession) return;
+      if (!xrSession) {
+        packetView.textContent = 'onXRFrame entered but xrSession is null';
+        return;
+      }
+    
+      packetView.textContent = `onXRFrame entered, frameCounter=${frameCounter}`;
       xrSession.requestAnimationFrame(onXRFrame);
       frameCounter += 1;
   
@@ -720,7 +752,16 @@ Recommended backend logic:
     }
   
     connectBtn.addEventListener('click', connectWebSocket);
-    enterVrBtn.addEventListener('click', startXR);
+    enterVrBtn.addEventListener('click', async () => {
+      packetView.textContent = 'Enter VR clicked...';
+      try {
+        await startXR();
+        packetView.textContent = 'startXR() finished, waiting for XR frames...';
+      } catch (e) {
+        console.error(e);
+        packetView.textContent = 'startXR() ERROR: ' + (e?.message || e);
+      }
+    });
     setRefBtn.addEventListener('click', () => {
       pendingSetReference = true;
       setPill(refDot, refStatus, '', 'Reference: pending on next XR frame');
