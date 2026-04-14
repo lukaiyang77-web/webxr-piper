@@ -212,6 +212,7 @@ Recommended backend logic:
   
     let pendingSetReference = false;
     let refMatrix = null;
+    let lastB5Pressed = false;
   
     const wsUrlInput = document.getElementById('wsUrl');
     const connectBtn = document.getElementById('connectBtn');
@@ -498,19 +499,19 @@ Recommended backend logic:
       for (const inputSource of xrSession.inputSources) {
         let pose = null;
         let usedSpace = null;
-  
+      
         if (inputSource.gripSpace) {
           pose = frame.getPose(inputSource.gripSpace, xrRefSpace);
           usedSpace = 'grip';
         }
-  
+      
         if (!pose && inputSource.targetRaySpace) {
           pose = frame.getPose(inputSource.targetRaySpace, xrRefSpace);
           usedSpace = 'targetRay';
         }
-  
+      
         if (!pose) continue;
-  
+      
         const state = {
           handedness: inputSource.handedness,
           pose: {
@@ -534,7 +535,7 @@ Recommended backend logic:
           },
           profiles: inputSource.profiles || [],
         };
-  
+      
         if (inputSource.handedness === 'right') {
           packet.right = state;
           rightPose = pose;
@@ -544,7 +545,20 @@ Recommended backend logic:
           leftPose = pose;
         }
       }
-  
+      
+      // Frontend-side B button edge detect: update green reference ball too
+      const b5PressedNow = !!packet.right?.gamepad?.buttons?.b5?.pressed;
+      const b5Edge = b5PressedNow && !lastB5Pressed;
+      
+      if (b5Edge && packet.right?.pose?.matrix) {
+        refMatrix = packet.right.pose.matrix.slice();
+        sendDebug('b5_frontend_ref_update', 'Frontend refMatrix updated by B button', {
+          space: packet.right.pose.space
+        });
+      }
+      
+      lastB5Pressed = b5PressedNow;
+      
       let refReadyThisFrame = false;
       let refPacketActuallySent = false;
       
