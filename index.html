@@ -567,7 +567,13 @@ Recommended backend logic:
         return;
       }
     
-      packetView.textContent = `onXRFrame entered, frameCounter=${frameCounter}`;
+      const sourceSummaryText = (xrSession.inputSources || []).map((s, i) =>
+        `source[${i}] handedness=${s.handedness} grip=${!!s.gripSpace} targetRay=${!!s.targetRaySpace} gamepad=${!!s.gamepad}`
+      ).join('\n') || 'no input sources';
+      
+      packetView.textContent =
+        `onXRFrame entered, frameCounter=${frameCounter}\n\n` +
+        sourceSummaryText;
       xrSession.requestAnimationFrame(onXRFrame);
       frameCounter += 1;
   
