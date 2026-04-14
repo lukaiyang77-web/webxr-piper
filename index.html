@@ -545,13 +545,12 @@ Recommended backend logic:
         }
       }
   
-      let refWasActuallySent = false;
+      let refReadyThisFrame = false;
+      let refPacketActuallySent = false;
+      
       if (pendingSetReference && packet.right?.pose?.matrix) {
         refMatrix = packet.right.pose.matrix.slice();
-        refWasActuallySent = true;
-        sendDebug('set_reference_success', 'Reference set on frontend', {
-          space: packet.right.pose.space
-        });
+        refReadyThisFrame = true;
       }
   
       if (viewerPose) {
@@ -580,35 +579,42 @@ Recommended backend logic:
       const nowMs = performance.now();
       if (nowMs - lastSentTime >= SEND_INTERVAL_MS) {
         lastSentTime = nowMs;
-  
+      
         if (!packet.right) {
           sendDebug('right_not_tracked', 'Right controller not tracked in this XR frame');
         }
-  
-        if (pendingSetReference && !refWasActuallySent) {
+      
+        if (pendingSetReference && !refReadyThisFrame) {
           sendDebug('set_reference_wait', 'Set reference requested, waiting for right controller tracking');
         }
-  
+      
         sendPacket(packet);
-  
+      
+        if (pendingSetReference && refReadyThisFrame) {
+          refPacketActuallySent = true;
+          sendDebug('set_reference_success', 'Reference sent to backend', {
+            space: packet.right.pose.space
+          });
+        }
+      
         const rp = packet.right?.pose?.position;
         const rspace = packet.right?.pose?.space || 'none';
         const text = rp
           ? `XR packet
-  right.position = (${rp.x.toFixed(3)}, ${rp.y.toFixed(3)}, ${rp.z.toFixed(3)})
-  right.space = ${rspace}
-  ref = ${refMatrix ? 'set' : 'not set'}
-  ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}`
+      right.position = (${rp.x.toFixed(3)}, ${rp.y.toFixed(3)}, ${rp.z.toFixed(3)})
+      right.space = ${rspace}
+      ref = ${refMatrix ? 'set' : 'not set'}
+      ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}`
           : `XR packet
-  right controller not tracked
-  right.space = none
-  ref = ${refMatrix ? 'set' : 'not set'}
-  ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}`;
-  
+      right controller not tracked
+      right.space = none
+      ref = ${refMatrix ? 'set' : 'not set'}
+      ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}`;
+      
         packetView.textContent = text + '\n\n' + JSON.stringify(packet, null, 2);
       }
   
-      if (refWasActuallySent) {
+      if (refPacketActuallySent) {
         pendingSetReference = false;
         setPill(refDot, refStatus, 'ok', 'Reference: sent to backend');
       } else if (pendingSetReference) {
