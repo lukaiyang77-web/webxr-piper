@@ -204,15 +204,22 @@ Recommended backend logic:
     let xrSession = null;
     let xrRefSpace = null;
     let gl = null;
-    let refPosition = null;
     let frameCounter = 0;
     let lastSentTime = 0;
     const SEND_INTERVAL_MS = 50; // ~20 Hz
     const XR_MODE = 'immersive-ar';
   
-    let pendingSetReference = false;
+    let controlActive = false;
+    let lastGripPressed = false;
+    let lastRightControllerState = null;
     let refMatrix = null;
-    let lastB5Pressed = false;
+    let refPosition = null;
+
+    let gripperClosed = false;
+
+    let lastAButtonPressed = false;
+    let lastOpenButtonPressed = false;
+    let lastCloseButtonPressed = false;
   
     const wsUrlInput = document.getElementById('wsUrl');
     const connectBtn = document.getElementById('connectBtn');
@@ -433,6 +440,129 @@ Recommended backend logic:
       return out;
     }
 
+    function invertMat4(m) {
+      const inv = new Float32Array(16);
+
+      inv[0] = m[5]  * m[10] * m[15] - 
+              m[5]  * m[11] * m[14] - 
+              m[9]  * m[6]  * m[15] + 
+              m[9]  * m[7]  * m[14] +
+              m[13] * m[6]  * m[11] - 
+              m[13] * m[7]  * m[10];
+
+      inv[4] = -m[4]  * m[10] * m[15] + 
+                m[4]  * m[11] * m[14] + 
+                m[8]  * m[6]  * m[15] - 
+                m[8]  * m[7]  * m[14] - 
+                m[12] * m[6]  * m[11] + 
+                m[12] * m[7]  * m[10];
+
+      inv[8] = m[4]  * m[9] * m[15] - 
+              m[4]  * m[11] * m[13] - 
+              m[8]  * m[5] * m[15] + 
+              m[8]  * m[7] * m[13] + 
+              m[12] * m[5] * m[11] - 
+              m[12] * m[7] * m[9];
+
+      inv[12] = -m[4]  * m[9] * m[14] + 
+                m[4]  * m[10] * m[13] +
+                m[8]  * m[5] * m[14] - 
+                m[8]  * m[6] * m[13] - 
+                m[12] * m[5] * m[10] + 
+                m[12] * m[6] * m[9];
+
+      inv[1] = -m[1]  * m[10] * m[15] + 
+                m[1]  * m[11] * m[14] + 
+                m[9]  * m[2] * m[15] - 
+                m[9]  * m[3] * m[14] - 
+                m[13] * m[2] * m[11] + 
+                m[13] * m[3] * m[10];
+
+      inv[5] = m[0]  * m[10] * m[15] - 
+              m[0]  * m[11] * m[14] - 
+              m[8]  * m[2] * m[15] + 
+              m[8]  * m[3] * m[14] + 
+              m[12] * m[2] * m[11] - 
+              m[12] * m[3] * m[10];
+
+      inv[9] = -m[0]  * m[9] * m[15] + 
+                m[0]  * m[11] * m[13] + 
+                m[8]  * m[1] * m[15] - 
+                m[8]  * m[3] * m[13] - 
+                m[12] * m[1] * m[11] + 
+                m[12] * m[3] * m[9];
+
+      inv[13] = m[0]  * m[9] * m[14] - 
+                m[0]  * m[10] * m[13] - 
+                m[8]  * m[1] * m[14] + 
+                m[8]  * m[2] * m[13] + 
+                m[12] * m[1] * m[10] - 
+                m[12] * m[2] * m[9];
+
+      inv[2] = m[1]  * m[6] * m[15] - 
+              m[1]  * m[7] * m[14] - 
+              m[5]  * m[2] * m[15] + 
+              m[5]  * m[3] * m[14] + 
+              m[13] * m[2] * m[7] - 
+              m[13] * m[3] * m[6];
+
+      inv[6] = -m[0]  * m[6] * m[15] + 
+                m[0]  * m[7] * m[14] + 
+                m[4]  * m[2] * m[15] - 
+                m[4]  * m[3] * m[14] - 
+                m[12] * m[2] * m[7] + 
+                m[12] * m[3] * m[6];
+
+      inv[10] = m[0]  * m[5] * m[15] - 
+                m[0]  * m[7] * m[13] - 
+                m[4]  * m[1] * m[15] + 
+                m[4]  * m[3] * m[13] + 
+                m[12] * m[1] * m[7] - 
+                m[12] * m[3] * m[5];
+
+      inv[14] = -m[0]  * m[5] * m[14] + 
+                m[0]  * m[6] * m[13] + 
+                m[4]  * m[1] * m[14] - 
+                m[4]  * m[2] * m[13] - 
+                m[12] * m[1] * m[6] + 
+                m[12] * m[2] * m[5];
+
+      inv[3] = -m[1] * m[6] * m[11] + 
+                m[1] * m[7] * m[10] + 
+                m[5] * m[2] * m[11] - 
+                m[5] * m[3] * m[10] - 
+                m[9] * m[2] * m[7] + 
+                m[9] * m[3] * m[6];
+
+      inv[7] = m[0] * m[6] * m[11] - 
+              m[0] * m[7] * m[10] - 
+              m[4] * m[2] * m[11] + 
+              m[4] * m[3] * m[10] + 
+              m[8] * m[2] * m[7] - 
+              m[8] * m[3] * m[6];
+
+      inv[11] = -m[0] * m[5] * m[11] + 
+                m[0] * m[7] * m[9] + 
+                m[4] * m[1] * m[11] - 
+                m[4] * m[3] * m[9] - 
+                m[8] * m[1] * m[7] + 
+                m[8] * m[3] * m[5];
+
+      inv[15] = m[0] * m[5] * m[10] - 
+                m[0] * m[6] * m[9] - 
+                m[4] * m[1] * m[10] + 
+                m[4] * m[2] * m[9] + 
+                m[8] * m[1] * m[6] - 
+                m[8] * m[2] * m[5];
+
+      let det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
+      if (Math.abs(det) < 1e-8) return null;
+
+      det = 1.0 / det;
+      for (let i = 0; i < 16; i++) inv[i] *= det;
+      return inv;
+    }
+
     function drawHudPoint(view, localX, localY, localZ, color) {
       // local position is relative to the viewer/head
       const hudLocal = makeTranslationMatrix(localX, localY, localZ);
@@ -445,6 +575,86 @@ Recommended backend logic:
       gl.drawArrays(gl.POINTS, 0, 1);
     }
   
+    function buildArmGoalFromRightController(rightState) {
+      const goal = {
+        type: 'xr_arm_goal',
+        arm: 'right',
+        timestamp_ms: performance.now(),
+        frame_counter: frameCounter,
+        control_active: false,
+        reset_reference: false,
+        reset_to_init: false,
+        gripper_closed: gripperClosed,
+        relative_transform: null,
+        meta: {
+          space: rightState?.pose?.space || 'none',
+        },
+      };
+
+      if (!rightState || !rightState.pose || !rightState.pose.matrix) {
+        controlActive = false;
+        return goal;
+      }
+
+      const buttons = rightState.gamepad?.buttons || {};
+
+      // 这里 grip 按钮编号你后面实测再确认
+      const gripPressed = !!buttons.b2?.pressed;
+      const aPressed = !!buttons.b4?.pressed;
+      const openPressed = !!buttons.b0?.pressed;
+      const closePressed = !!buttons.b1?.pressed;
+
+      const gripEdge = gripPressed && !lastGripPressed;
+      const aEdge = aPressed && !lastAButtonPressed;
+      const openEdge = openPressed && !lastOpenButtonPressed;
+      const closeEdge = closePressed && !lastCloseButtonPressed;
+
+      // gripper state
+      if (openEdge) gripperClosed = false;
+      if (closeEdge) gripperClosed = true;
+      goal.gripper_closed = gripperClosed;
+
+      // home
+      if (aEdge) {
+        goal.reset_to_init = true;
+      }
+
+      // grip-driven arm teleop
+      if (gripPressed) {
+        if (!controlActive || gripEdge || !refMatrix) {
+          refMatrix = rightState.pose.matrix.slice();
+          refPosition = { ...rightState.pose.position };
+          goal.reset_reference = true;
+          controlActive = true;
+          setPill(refDot, refStatus, 'ok', 'Reference: set by grip');
+        }
+
+        goal.control_active = true;
+
+        const currentMatrix = new Float32Array(rightState.pose.matrix);
+        const refMat = new Float32Array(refMatrix);
+
+        const invRef = invertMat4(refMat);
+        if (invRef) {
+          const rel = multiplyMat4(invRef, currentMatrix);
+          goal.relative_transform = {
+            matrix: Array.from(rel),
+          };
+        }
+      } else {
+        controlActive = false;
+        goal.control_active = false;
+        goal.relative_transform = null;
+      }
+
+      lastGripPressed = gripPressed;
+      lastAButtonPressed = aPressed;
+      lastOpenButtonPressed = openPressed;
+      lastCloseButtonPressed = closePressed;
+
+      return goal;
+    }
+
     async function startXR() {
       if (!navigator.xr) {
         alert('WebXR is not available in this browser. Open this page in the Quest browser.');
@@ -510,15 +720,13 @@ Recommended backend logic:
   
       const viewerPose = frame.getViewerPose(xrRefSpace);
   
-      const packet = {
-        type: 'xr_controller_state',
-        timestamp_ms: performance.now(),
-        frame_counter: frameCounter,
-        set_reference: pendingSetReference,
+      const controllerSnapshot = {
         right: null,
         left: null,
       };
   
+      
+
       let rightPose = null;
       let leftPose = null;
   
@@ -563,37 +771,38 @@ Recommended backend logic:
         };
       
         if (inputSource.handedness === 'right') {
-          packet.right = state;
+          controllerSnapshot.right = state;
           rightPose = pose;
         }
         if (inputSource.handedness === 'left') {
-          packet.left = state;
+          controllerSnapshot.left = state;
           leftPose = pose;
         }
       }
       
+      lastRightControllerState = controllerSnapshot.right;
       // Frontend-side B button edge detect: update green reference ball too
-      const b5PressedNow = !!packet.right?.gamepad?.buttons?.b5?.pressed;
-      const b5Edge = b5PressedNow && !lastB5Pressed;
+      // const b5PressedNow = !!packet.right?.gamepad?.buttons?.b5?.pressed;
+      // const b5Edge = b5PressedNow && !lastB5Pressed;
       
-      if (b5Edge && packet.right?.pose?.matrix) {
-        refMatrix = packet.right.pose.matrix.slice();
-        refPosition = { ...packet.right.pose.position };
-        sendDebug('b5_frontend_ref_update', 'Frontend refMatrix updated by B button', {
-          space: packet.right.pose.space
-        });
-      }
+      // if (b5Edge && packet.right?.pose?.matrix) {
+      //   refMatrix = packet.right.pose.matrix.slice();
+      //   refPosition = { ...packet.right.pose.position };
+      //   sendDebug('b5_frontend_ref_update', 'Frontend refMatrix updated by B button', {
+      //     space: packet.right.pose.space
+      //   });
+      // }
       
-      lastB5Pressed = b5PressedNow;
+      // lastB5Pressed = b5PressedNow;
       
-      let refReadyThisFrame = false;
-      let refPacketActuallySent = false;
+      // let refReadyThisFrame = false;
+      // let refPacketActuallySent = false;
       
-      if (pendingSetReference && packet.right?.pose?.matrix) {
-        refMatrix = packet.right.pose.matrix.slice();
-        refPosition = { ...packet.right.pose.position };
-        refReadyThisFrame = true;
-      }
+      // if (pendingSetReference && packet.right?.pose?.matrix) {
+      //   refMatrix = packet.right.pose.matrix.slice();
+      //   refPosition = { ...packet.right.pose.position };
+      //   refReadyThisFrame = true;
+      // }
   
       if (viewerPose) {
         gl.useProgram(xrProgram);
@@ -617,8 +826,7 @@ Recommended backend logic:
           }
 
           const wsOpen = !!(ws && ws.readyState === WebSocket.OPEN);
-          const rightTracked = !!packet.right;
-          const refPending = !!pendingSetReference;
+          const rightTracked = !!controllerSnapshot.right;
           const refSet = !!refMatrix;
 
           // Tracking ball:
@@ -630,9 +838,7 @@ Recommended backend logic:
           // Reference ball:
           // white = set, yellow = pending, dark red = not set
           let refColor = [0.35, 0.08, 0.08, 1.0]; // dark red default
-          if (refPending) {
-            refColor = [1.00, 0.88, 0.20, 1.0];   // yellow
-          } else if (refSet) {
+          if (refSet) {
             refColor = [1.00, 1.00, 1.00, 1.0];   // white
           }
 
@@ -653,63 +859,50 @@ Recommended backend logic:
       const nowMs = performance.now();
       if (nowMs - lastSentTime >= SEND_INTERVAL_MS) {
         lastSentTime = nowMs;
-      
-        if (!packet.right) {
+
+        if (!controllerSnapshot.right) {
           sendDebug('right_not_tracked', 'Right controller not tracked in this XR frame');
         }
-      
-        if (pendingSetReference && !refReadyThisFrame) {
-          sendDebug('set_reference_wait', 'Set reference requested, waiting for right controller tracking');
-        }
-      
-        sendPacket(packet);
-      
-        if (pendingSetReference && refReadyThisFrame) {
-          refPacketActuallySent = true;
-          sendDebug('set_reference_success', 'Reference sent to backend', {
-            space: packet.right.pose.space
-          });
-        }
-      
-        const rp = packet.right?.pose?.position;
-        const rspace = packet.right?.pose?.space || 'none';
-        
+
+        const armGoalPacket = buildArmGoalFromRightController(controllerSnapshot.right);
+        sendPacket(armGoalPacket);
+
+        const rp = controllerSnapshot.right?.pose?.position;
+        const rspace = controllerSnapshot.right?.pose?.space || 'none';
+
         let extraText = '';
         if (rp && refPosition) {
           extraText =
             `\nref.position = (${refPosition.x.toFixed(3)}, ${refPosition.y.toFixed(3)}, ${refPosition.z.toFixed(3)})` +
             `\ndelta = (${(rp.x - refPosition.x).toFixed(4)}, ${(rp.y - refPosition.y).toFixed(4)}, ${(rp.z - refPosition.z).toFixed(4)})`;
         }
-        
+
         const text = rp
-          ? `XR packet
-        right.position = (${rp.x.toFixed(3)}, ${rp.y.toFixed(3)}, ${rp.z.toFixed(3)})
-        right.space = ${rspace}
-        ref = ${refMatrix ? 'set' : 'not set'}
-        ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}${extraText}`
-          : `XR packet
-        right controller not tracked
-        right.space = none
-        ref = ${refMatrix ? 'set' : 'not set'}
-        ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}`;
-      
-        packetView.textContent = text + '\n\n' + JSON.stringify(packet, null, 2);
+          ? `XR arm goal
+      right.position = (${rp.x.toFixed(3)}, ${rp.y.toFixed(3)}, ${rp.z.toFixed(3)})
+      right.space = ${rspace}
+      control_active = ${armGoalPacket.control_active}
+      reset_reference = ${armGoalPacket.reset_reference}
+      reset_to_init = ${armGoalPacket.reset_to_init}
+      gripper_closed = ${armGoalPacket.gripper_closed}
+      ref = ${refMatrix ? 'set' : 'not set'}
+      ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}${extraText}`
+          : `XR arm goal
+      right controller not tracked
+      control_active = ${armGoalPacket.control_active}
+      ref = ${refMatrix ? 'set' : 'not set'}
+      ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}`;
+
+        packetView.textContent = text + '\n\n' + JSON.stringify(armGoalPacket, null, 2);
       }
   
-      if (refPacketActuallySent) {
-        pendingSetReference = false;
-        setPill(refDot, refStatus, 'ok', 'Reference: sent to backend');
-      } else if (pendingSetReference) {
-        setPill(refDot, refStatus, '', 'Reference: waiting for right controller tracking');
-      }
     }
   
     connectBtn.addEventListener('click', connectWebSocket);
     enterVrBtn.addEventListener('click', startXR);
     setRefBtn.addEventListener('click', () => {
-      pendingSetReference = true;
-      setPill(refDot, refStatus, '', 'Reference: pending on next XR frame');
-      sendDebug('set_reference_click', 'Set Reference button clicked');
+      sendDebug('set_reference_click', 'Set Reference button clicked (UI only)');
+      setPill(refDot, refStatus, '', 'Reference: use grip press to set');
     });
   
     if (!('xr' in navigator)) {
