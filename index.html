@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WebXR Piper Controller</title>
+  <title>WebXR Piper Controller V1</title>
   <style>
     :root {
       color-scheme: dark;
@@ -743,7 +743,17 @@ Recommended backend logic:
           pose = frame.getPose(inputSource.targetRaySpace, xrRefSpace);
           usedSpace = 'targetRay';
         }
-      
+
+        if (!pose) {
+          sendDebug('pose_missing', 'Pose missing for input source', {
+            handedness: inputSource.handedness,
+            triedGrip: !!inputSource.gripSpace,
+            triedTargetRay: !!inputSource.targetRaySpace,
+            profiles: inputSource.profiles || [],
+          });
+          continue;
+        }
+        
         if (!pose) continue;
       
         const state = {
@@ -769,7 +779,14 @@ Recommended backend logic:
           },
           profiles: inputSource.profiles || [],
         };
-      
+
+        sendDebug('input_source_seen', 'XR input source observed', {
+          handedness: inputSource.handedness,
+          hasGripSpace: !!inputSource.gripSpace,
+          hasTargetRaySpace: !!inputSource.targetRaySpace,
+          profiles: inputSource.profiles || [],
+          gamepadButtons: inputSource.gamepad?.buttons?.length || 0,
+        });
         if (inputSource.handedness === 'right') {
           controllerSnapshot.right = state;
           rightPose = pose;
