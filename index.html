@@ -574,87 +574,91 @@ Recommended backend logic:
       gl.uniform4f(uColor, color[0], color[1], color[2], color[3]);
       gl.drawArrays(gl.POINTS, 0, 1);
     }
+
+  function getButtonPressed(state, index) {
+    return !!state?.gamepad?.buttons?.[`b${index}`]?.pressed;
+  }
   
-    function buildArmGoalFromRightController(rightState) {
-      const goal = {
-        type: 'xr_arm_goal',
-        arm: 'right',
-        timestamp_ms: performance.now(),
-        frame_counter: frameCounter,
-        control_active: false,
-        reset_reference: false,
-        reset_to_init: false,
-        gripper_closed: gripperClosed,
-        relative_transform: null,
-        meta: {
-          space: rightState?.pose?.space || 'none',
-        },
+  function getButtonValue(state, index) {
+    const v = state?.gamepad?.buttons?.[`b${index}`]?.value;
+    return Number(v || 0);
+  }
+  
+  function convertControllerState(state) {
+    if (!state || !state.pose) {
+      return {
+        position: null,
+        quaternion: null,
+        gripActive: false,
+        trigger: 0.0,
+        buttons: {},
+        axes: [],
+        tracked: false,
+        poseSpace: 'none',
+        profiles: [],
       };
-
-      if (!rightState || !rightState.pose || !rightState.pose.matrix) {
-        controlActive = false;
-        return goal;
-      }
-
-      const buttons = rightState.gamepad?.buttons || {};
-
-      // 这里 grip 按钮编号你后面实测再确认
-      const gripPressed = !!buttons.b2?.pressed;
-      const aPressed = !!buttons.b4?.pressed;
-      const openPressed = !!buttons.b0?.pressed;
-      const closePressed = !!buttons.b1?.pressed;
-
-      const gripEdge = gripPressed && !lastGripPressed;
-      const aEdge = aPressed && !lastAButtonPressed;
-      const openEdge = openPressed && !lastOpenButtonPressed;
-      const closeEdge = closePressed && !lastCloseButtonPressed;
-
-      // gripper state
-      if (openEdge) gripperClosed = false;
-      if (closeEdge) gripperClosed = true;
-      goal.gripper_closed = gripperClosed;
-
-      // home
-      if (aEdge) {
-        goal.reset_to_init = true;
-      }
-
-      // grip-driven arm teleop
-      if (gripPressed) {
-        if (!controlActive || gripEdge || !refMatrix) {
-          refMatrix = rightState.pose.matrix.slice();
-          refPosition = { ...rightState.pose.position };
-          goal.reset_reference = true;
-          controlActive = true;
-          setPill(refDot, refStatus, 'ok', 'Reference: set by grip');
-        }
-
-        goal.control_active = true;
-
-        const currentMatrix = new Float32Array(rightState.pose.matrix);
-        const refMat = new Float32Array(refMatrix);
-
-        const invRef = invertMat4(refMat);
-        if (invRef) {
-          const rel = multiplyMat4(invRef, currentMatrix);
-          goal.relative_transform = {
-            matrix: Array.from(rel),
-          };
-        }
-      } else {
-        controlActive = false;
-        goal.control_active = false;
-        goal.relative_transform = null;
-      }
-
-      lastGripPressed = gripPressed;
-      lastAButtonPressed = aPressed;
-      lastOpenButtonPressed = openPressed;
-      lastCloseButtonPressed = closePressed;
-
-      return goal;
     }
+  
+    const gripActive = getButtonPressed(state, 2);
+    const triggerValue = getButtonValue(state, 0);
+  
+    return {
+      position: {
+        x: Number(state.pose.position.x),
+        y: Number(state.pose.position.y),
+        z: Number(state.pose.position.z),
+      },
+      quaternion: {
+        x: Number(state.pose.orientation.x),
+        y: Number(state.pose.orientation.y),
+        z: Number(state.pose.orientation.z),
+        w: Number(state.pose.orientation.w),
+      },
+      gripActive,
+      trigger: triggerValue,
+      buttons: state.gamepad?.buttons || {},
+      axes: state.gamepad?.axes || [],
+      tracked: true,
+      poseSpace: state.pose.space || 'none',
+      profiles: state.profiles || [],
+    };
+  }
 
+  function buildSDKStyleControllerPacket(controllerSnapshot) {
+    const rightGripPressed = getButtonPressed(controllerSnapshot.right, 2);
+    const rightTriggerPressed = getButtonValue(controllerSnapshot.right, 0) > 0.5;
+    const aPressed = getButtonPressed(controllerSnapshot.right, 4);
+  
+    const gripPressedEdge = rightGripPressed && !lastRightGripPressed;
+    const triggerPressedEdge = rightTriggerPressed && !lastRightTriggerPressed;
+  
+    const gripReleased = (!rightGripPressed && lastRightGripPressed);
+    const triggerReleased = (!rightTriggerPressed && lastRightTriggerPressed);
+    const resetEvent = (aPressed && !lastAButtonPressed);
+  
+    const packet = {
+      type: 'vr_controller_state',
+      timestamp_ms: performance.now(),
+      frame_counter: frameCounter,
+  
+      leftController: convertControllerState(controllerSnapshot.left),
+      rightController: convertControllerState(controllerSnapshot.right),
+  
+      hand: 'right',
+      gripPressedEdge,
+      gripReleased,
+      triggerPressedEdge,
+      triggerReleased,
+      resetEvent,
+    };
+  
+    lastRightGripPressed = rightGripPressed;
+    lastRightTriggerPressed = rightTriggerPressed;
+    lastAButtonPressed = aPressed;
+  
+    return packet;
+  }
+    
     async function startXR() {
       if (!navigator.xr) {
         alert('WebXR is not available in this browser. Open this page in the Quest browser.');
@@ -881,8 +885,8 @@ Recommended backend logic:
           sendDebug('right_not_tracked', 'Right controller not tracked in this XR frame');
         }
 
-        const armGoalPacket = buildArmGoalFromRightController(controllerSnapshot.right);
-        sendPacket(armGoalPacket);
+        const controllerPacket = buildSDKStyleControllerPacket(controllerSnapshot);
+        sendPacket(controllerPacket);
 
         const rp = controllerSnapshot.right?.pose?.position;
         const rspace = controllerSnapshot.right?.pose?.space || 'none';
