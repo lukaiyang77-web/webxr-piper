@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WebXR Piper Controller V1</title>
+  <title>WebXR Piper Controller V4</title>
   <style>
     :root {
       color-scheme: dark;
@@ -146,7 +146,7 @@
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>WebXR Piper Controller V1</h1>
+      <h1>WebXR Piper Controller V4</h1>
       <p>
         Open this page in the Quest browser, connect to your Python backend with WebSocket,
         enter VR, then use the <strong>right controller pose</strong> as the teleop source.
@@ -210,7 +210,8 @@ Recommended backend logic:
     const XR_MODE = 'immersive-ar';
   
     let controlActive = false;
-    let lastGripPressed = false;
+    let lastRightGripPressed = false;
+    let lastRightTriggerPressed = false;
     let lastRightControllerState = null;
     let refMatrix = null;
     let refPosition = null;
@@ -218,8 +219,7 @@ Recommended backend logic:
     let gripperClosed = false;
 
     let lastAButtonPressed = false;
-    let lastOpenButtonPressed = false;
-    let lastCloseButtonPressed = false;
+    
   
     const wsUrlInput = document.getElementById('wsUrl');
     const connectBtn = document.getElementById('connectBtn');
@@ -575,89 +575,89 @@ Recommended backend logic:
       gl.drawArrays(gl.POINTS, 0, 1);
     }
 
-  function getButtonPressed(state, index) {
-    return !!state?.gamepad?.buttons?.[`b${index}`]?.pressed;
-  }
-  
-  function getButtonValue(state, index) {
-    const v = state?.gamepad?.buttons?.[`b${index}`]?.value;
-    return Number(v || 0);
-  }
-  
-  function convertControllerState(state) {
-    if (!state || !state.pose) {
+    function getButtonPressed(state, index) {
+      return !!state?.gamepad?.buttons?.[`b${index}`]?.pressed;
+    }
+    
+    function getButtonValue(state, index) {
+      const v = state?.gamepad?.buttons?.[`b${index}`]?.value;
+      return Number(v || 0);
+    }
+    
+    function convertControllerState(state) {
+      if (!state || !state.pose) {
+        return {
+          position: null,
+          quaternion: null,
+          gripActive: false,
+          trigger: 0.0,
+          buttons: {},
+          axes: [],
+          tracked: false,
+          poseSpace: 'none',
+          profiles: [],
+        };
+      }
+    
+      const gripActive = getButtonPressed(state, 2);
+      const triggerValue = getButtonValue(state, 0);
+    
       return {
-        position: null,
-        quaternion: null,
-        gripActive: false,
-        trigger: 0.0,
-        buttons: {},
-        axes: [],
-        tracked: false,
-        poseSpace: 'none',
-        profiles: [],
+        position: {
+          x: Number(state.pose.position.x),
+          y: Number(state.pose.position.y),
+          z: Number(state.pose.position.z),
+        },
+        quaternion: {
+          x: Number(state.pose.orientation.x),
+          y: Number(state.pose.orientation.y),
+          z: Number(state.pose.orientation.z),
+          w: Number(state.pose.orientation.w),
+        },
+        gripActive,
+        trigger: triggerValue,
+        buttons: state.gamepad?.buttons || {},
+        axes: state.gamepad?.axes || [],
+        tracked: true,
+        poseSpace: state.pose.space || 'none',
+        profiles: state.profiles || [],
       };
     }
-  
-    const gripActive = getButtonPressed(state, 2);
-    const triggerValue = getButtonValue(state, 0);
-  
-    return {
-      position: {
-        x: Number(state.pose.position.x),
-        y: Number(state.pose.position.y),
-        z: Number(state.pose.position.z),
-      },
-      quaternion: {
-        x: Number(state.pose.orientation.x),
-        y: Number(state.pose.orientation.y),
-        z: Number(state.pose.orientation.z),
-        w: Number(state.pose.orientation.w),
-      },
-      gripActive,
-      trigger: triggerValue,
-      buttons: state.gamepad?.buttons || {},
-      axes: state.gamepad?.axes || [],
-      tracked: true,
-      poseSpace: state.pose.space || 'none',
-      profiles: state.profiles || [],
-    };
-  }
 
-  function buildSDKStyleControllerPacket(controllerSnapshot) {
-    const rightGripPressed = getButtonPressed(controllerSnapshot.right, 2);
-    const rightTriggerPressed = getButtonValue(controllerSnapshot.right, 0) > 0.5;
-    const aPressed = getButtonPressed(controllerSnapshot.right, 4);
-  
-    const gripPressedEdge = rightGripPressed && !lastRightGripPressed;
-    const triggerPressedEdge = rightTriggerPressed && !lastRightTriggerPressed;
-  
-    const gripReleased = (!rightGripPressed && lastRightGripPressed);
-    const triggerReleased = (!rightTriggerPressed && lastRightTriggerPressed);
-    const resetEvent = (aPressed && !lastAButtonPressed);
-  
-    const packet = {
-      type: 'vr_controller_state',
-      timestamp_ms: performance.now(),
-      frame_counter: frameCounter,
-  
-      leftController: convertControllerState(controllerSnapshot.left),
-      rightController: convertControllerState(controllerSnapshot.right),
-  
-      hand: 'right',
-      gripPressedEdge,
-      gripReleased,
-      triggerPressedEdge,
-      triggerReleased,
-      resetEvent,
-    };
-  
-    lastRightGripPressed = rightGripPressed;
-    lastRightTriggerPressed = rightTriggerPressed;
-    lastAButtonPressed = aPressed;
-  
-    return packet;
-  }
+    function buildSDKStyleControllerPacket(controllerSnapshot) {
+      const rightGripPressed = getButtonPressed(controllerSnapshot.right, 2);
+      const rightTriggerPressed = getButtonValue(controllerSnapshot.right, 0) > 0.5;
+      const aPressed = getButtonPressed(controllerSnapshot.right, 4);
+    
+      const gripPressedEdge = rightGripPressed && !lastRightGripPressed;
+      const triggerPressedEdge = rightTriggerPressed && !lastRightTriggerPressed;
+    
+      const gripReleased = (!rightGripPressed && lastRightGripPressed);
+      const triggerReleased = (!rightTriggerPressed && lastRightTriggerPressed);
+      const resetEvent = (aPressed && !lastAButtonPressed);
+    
+      const packet = {
+        type: 'vr_controller_state',
+        timestamp_ms: performance.now(),
+        frame_counter: frameCounter,
+    
+        leftController: convertControllerState(controllerSnapshot.left),
+        rightController: convertControllerState(controllerSnapshot.right),
+    
+        hand: 'right',
+        gripPressedEdge,
+        gripReleased,
+        triggerPressedEdge,
+        triggerReleased,
+        resetEvent,
+      };
+    
+      lastRightGripPressed = rightGripPressed;
+      lastRightTriggerPressed = rightTriggerPressed;
+      lastAButtonPressed = aPressed;
+    
+      return packet;
+    }
     
     async function startXR() {
       if (!navigator.xr) {
@@ -898,23 +898,27 @@ Recommended backend logic:
             `\ndelta = (${(rp.x - refPosition.x).toFixed(4)}, ${(rp.y - refPosition.y).toFixed(4)}, ${(rp.z - refPosition.z).toFixed(4)})`;
         }
 
-        const text = rp
-          ? `XR arm goal
-      right.position = (${rp.x.toFixed(3)}, ${rp.y.toFixed(3)}, ${rp.z.toFixed(3)})
-      right.space = ${rspace}
-      control_active = ${armGoalPacket.control_active}
-      reset_reference = ${armGoalPacket.reset_reference}
-      reset_to_init = ${armGoalPacket.reset_to_init}
-      gripper_closed = ${armGoalPacket.gripper_closed}
-      ref = ${refMatrix ? 'set' : 'not set'}
-      ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}${extraText}`
-          : `XR arm goal
-      right controller not tracked
-      control_active = ${armGoalPacket.control_active}
-      ref = ${refMatrix ? 'set' : 'not set'}
-      ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}`;
+        const gripActive = getButtonPressed(controllerSnapshot.right, 2);
+        const triggerValue = getButtonValue(controllerSnapshot.right, 0);
 
-        packetView.textContent = text + '\n\n' + JSON.stringify(armGoalPacket, null, 2);
+        const text = rp
+          ? `VR controller state
+        right.position = (${rp.x.toFixed(3)}, ${rp.y.toFixed(3)}, ${rp.z.toFixed(3)})
+        right.space = ${rspace}
+        right.gripActive = ${gripActive}
+        right.trigger = ${triggerValue.toFixed(3)}
+        resetEvent = ${controllerPacket.resetEvent}
+        gripPressedEdge = ${controllerPacket.gripPressedEdge}
+        gripReleased = ${controllerPacket.gripReleased}
+        triggerPressedEdge = ${controllerPacket.triggerPressedEdge}
+        triggerReleased = ${controllerPacket.triggerReleased}
+        ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}${extraText}`
+          : `VR controller state
+        right controller not tracked
+        resetEvent = ${controllerPacket.resetEvent}
+        ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}`;
+
+        packetView.textContent = text + '\n\n' + JSON.stringify(controllerPacket, null, 2);
       }
   
     }
