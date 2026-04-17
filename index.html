@@ -215,7 +215,7 @@ Recommended backend logic:
     let lastRightControllerState = null;
     let refMatrix = null;
     let refPosition = null;
-
+    let pendingSetReference = false;
     let gripperClosed = false;
 
     let lastAButtonPressed = false;
@@ -625,7 +625,7 @@ Recommended backend logic:
     }
 
     function buildSDKStyleControllerPacket(controllerSnapshot) {
-      const rightGripPressed = getButtonPressed(controllerSnapshot.right, 2);
+      const rightGripPressed = getButtonPressed(controllerSnapshot.right, 1);
       const rightTriggerPressed = getButtonValue(controllerSnapshot.right, 0) > 0.5;
       const aPressed = getButtonPressed(controllerSnapshot.right, 4);
     
@@ -826,7 +826,19 @@ Recommended backend logic:
       //   refPosition = { ...packet.right.pose.position };
       //   refReadyThisFrame = true;
       // }
-  
+
+      if (pendingSetReference && controllerSnapshot.right?.pose?.matrix) {
+        refMatrix = controllerSnapshot.right.pose.matrix.slice();
+        refPosition = { ...controllerSnapshot.right.pose.position };
+        pendingSetReference = false;
+      
+        sendDebug('frontend_ref_set', 'Frontend reference updated from current right pose', {
+          space: controllerSnapshot.right.pose.space,
+          position: refPosition,
+        });
+      
+        setPill(refDot, refStatus, 'ok', 'Reference: set');
+      }
       if (viewerPose) {
         gl.useProgram(xrProgram);
         gl.bindBuffer(gl.ARRAY_BUFFER, xrPointBuffer);
@@ -928,8 +940,9 @@ Recommended backend logic:
     connectBtn.addEventListener('click', connectWebSocket);
     enterVrBtn.addEventListener('click', startXR);
     setRefBtn.addEventListener('click', () => {
-      sendDebug('set_reference_click', 'Set Reference button clicked (UI only)');
-      setPill(refDot, refStatus, '', 'Reference: use grip press to set');
+      pendingSetReference = true;
+      sendDebug('set_reference_click', 'Set Reference button armed on frontend');
+      setPill(refDot, refStatus, '', 'Reference: waiting for right pose');
     });
   
     if (!('xr' in navigator)) {
