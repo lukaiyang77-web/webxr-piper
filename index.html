@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WebXR Piper Controller V5.1</title>
+  <title>WebXR Piper Controller V5.2</title>
   <style>
     :root {
       color-scheme: dark;
@@ -146,7 +146,7 @@
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>WebXR Piper Controller V5.1</h1>
+      <h1>WebXR Piper Controller V5.2</h1>
       <p>
         Open this page in the Quest browser, connect to your Python backend with WebSocket,
         enter VR, then use the <strong>right controller pose</strong> as the teleop source.
@@ -749,12 +749,14 @@ Recommended backend logic:
         }
 
         if (!pose) {
-          sendDebug('pose_missing', 'Pose missing for input source', {
-            handedness: inputSource.handedness,
-            triedGrip: !!inputSource.gripSpace,
-            triedTargetRay: !!inputSource.targetRaySpace,
-            profiles: inputSource.profiles || [],
-          });
+          if (inputSource.handedness === 'right') {
+            sendDebug('pose_missing', 'Pose missing for input source', {
+              handedness: inputSource.handedness,
+              triedGrip: !!inputSource.gripSpace,
+              triedTargetRay: !!inputSource.targetRaySpace,
+              profiles: inputSource.profiles || [],
+            });
+          }
           continue;
         }
         
