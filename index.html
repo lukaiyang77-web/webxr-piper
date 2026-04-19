@@ -912,7 +912,7 @@ Recommended backend logic:
             `\ndelta = (${(rp.x - refPosition.x).toFixed(4)}, ${(rp.y - refPosition.y).toFixed(4)}, ${(rp.z - refPosition.z).toFixed(4)})`;
         }
 
-        const gripActive = getButtonPressed(controllerSnapshot.right, 2);
+        const gripActive = getButtonPressed(controllerSnapshot.right, 1);
         const triggerValue = getButtonValue(controllerSnapshot.right, 0);
 
         const text = rp
