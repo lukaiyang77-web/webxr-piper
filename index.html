@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WebXR Piper Controller YOR Refactor</title>
+  <title>WebXR Piper Controller V5.2</title>
   <style>
     :root {
       color-scheme: dark;
@@ -18,7 +18,9 @@
       --accent: #78a6ff;
       --border: rgba(255,255,255,0.08);
     }
+
     * { box-sizing: border-box; }
+
     body {
       margin: 0;
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -27,12 +29,14 @@
       min-height: 100vh;
       padding: 20px;
     }
+
     .wrap {
       max-width: 1100px;
       margin: 0 auto;
       display: grid;
       gap: 16px;
     }
+
     .card {
       background: rgba(18, 25, 51, 0.94);
       border: 1px solid var(--border);
@@ -40,11 +44,28 @@
       padding: 18px;
       box-shadow: 0 12px 32px rgba(0,0,0,0.28);
     }
-    h1, h2 { margin: 0 0 10px 0; font-weight: 700; }
+
+    h1, h2 {
+      margin: 0 0 10px 0;
+      font-weight: 700;
+    }
+
     h1 { font-size: 28px; }
     h2 { font-size: 18px; }
-    p { margin: 0; color: var(--muted); line-height: 1.5; }
-    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
     button, input {
       border-radius: 12px;
       border: 1px solid var(--border);
@@ -53,10 +74,25 @@
       padding: 12px 14px;
       font-size: 14px;
     }
-    button { cursor: pointer; font-weight: 600; }
-    button:hover { filter: brightness(1.08); }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    input { min-width: 320px; }
+
+    button {
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    input {
+      min-width: 320px;
+    }
+
     .pill {
       display: inline-flex;
       align-items: center;
@@ -68,6 +104,7 @@
       font-size: 13px;
       color: var(--muted);
     }
+
     .dot {
       width: 10px;
       height: 10px;
@@ -75,9 +112,16 @@
       background: var(--warn);
       box-shadow: 0 0 12px rgba(255, 204, 102, 0.45);
     }
+
     .dot.ok { background: var(--ok); box-shadow: 0 0 12px rgba(81, 216, 138, 0.45); }
     .dot.bad { background: var(--bad); box-shadow: 0 0 12px rgba(255, 107, 107, 0.45); }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
     pre {
       margin: 0;
       white-space: pre-wrap;
@@ -92,17 +136,21 @@
       min-height: 220px;
       overflow: auto;
     }
-    .hint { font-size: 13px; color: var(--muted); }
+
+    .hint {
+      font-size: 13px;
+      color: var(--muted);
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>WebXR Piper Controller · YOR-style Refactor</h1>
+      <h1>WebXR Piper Controller V5.4</h1>
       <p>
-        This frontend matches the refactored backend flow: <strong>hold right grip to start teleop and set the control anchor</strong>,
-        <strong>release grip to stop teleop</strong>, <strong>A to reset backend reference</strong>, and <strong>trigger for gripper state</strong>.
-        The green point is now only a local visual reference aid.
+        Open this page in the Quest browser, connect to your Python backend with WebSocket,
+        enter VR, then use the <strong>right controller pose</strong> as the teleop source.
+        Buttons are sent too, so you can map them to gripper and reset on the backend.
       </p>
     </div>
 
@@ -111,17 +159,16 @@
         <input id="wsUrl" value="ws://172.22.205.37:8765" />
         <button id="connectBtn">Connect WebSocket</button>
         <button id="enterVrBtn">Enter VR</button>
-        <button id="setRefBtn">Set Visual Ref</button>
+        <button id="setRefBtn">Set Reference</button>
       </div>
       <div class="row">
         <div class="pill"><span id="wsDot" class="dot"></span> <span id="wsStatus">WebSocket: disconnected</span></div>
         <div class="pill"><span id="xrDot" class="dot"></span> <span id="xrStatus">XR: idle</span></div>
-        <div class="pill"><span id="refDot" class="dot"></span> <span id="refStatus">Visual ref: not set</span></div>
-        <div class="pill"><span id="teleopDot" class="dot"></span> <span id="teleopStatus">Teleop: inactive</span></div>
+        <div class="pill"><span id="refDot" class="dot"></span> <span id="refStatus">Reference: not set</span></div>
       </div>
       <div class="row" style="margin-top: 12px;">
         <span class="hint">
-          Backend packet schema stays <code>type=vr_controller_state</code>. YOR-style behavior is now: grip edge defines the control anchor.
+          Suggested mapping on the backend: right controller pose → relative transform; A/B or trigger buttons → gripper/reset.
         </span>
       </div>
     </div>
@@ -134,20 +181,19 @@
       <div class="card">
         <h2>Instructions</h2>
         <pre>
-1. Start your Python backend.
-2. Open this page in the Quest browser.
-3. Tap “Connect WebSocket”.
-4. Tap “Enter VR”.
-5. Hold the right controller in your neutral pose and squeeze RIGHT GRIP to start teleop.
-6. Keep holding grip while moving.
-7. Release grip to stop teleop.
-8. Press A to request backend reset.
-9. Trigger is sent as analog gripper input.
+1. Start your Python WebSocket server on the Linux machine.
+2. Replace the WebSocket URL above if needed.
+3. Open this page in the Quest browser.
+4. Tap “Connect WebSocket”.
+5. Tap “Enter VR”.
+6. Tap “Set Reference” while holding the controller in your neutral pose.
+7. Move the right controller. The page will stream controller pose and button state.
 
-Local HUD balls:
-- left: right controller tracking
-- middle: local visual reference
-- right: websocket status
+Recommended backend logic:
+- Save reference when receive set_reference = true
+- Compute T_rel = inv(T_ref) @ T_now
+- Remap controller axes to robot axes
+- Use buttons for gripper/open close and reset
         </pre>
       </div>
     </div>
@@ -159,35 +205,35 @@ Local HUD balls:
     let xrRefSpace = null;
     let gl = null;
     let frameCounter = 0;
+    let lastSentTime = 0;
+    const SEND_INTERVAL_MS = 25; // ~20 Hz
     const XR_MODE = 'immersive-ar';
-
+  
+    let controlActive = false;
     let lastRightGripPressed = false;
     let lastRightTriggerPressed = false;
-    let lastAButtonPressed = false;
     let lastRightControllerState = null;
     let refMatrix = null;
     let refPosition = null;
-    let pendingVisualReference = false;
-    let packetCounter = 0;
-    let lastRightMissingDebugMs = -1;
-    let lastPoseMissingDebugMs = -1;
-    const DEBUG_THROTTLE_MS = 500;
+    let pendingSetReference = false;
+    let gripperClosed = false;
 
+    let lastAButtonPressed = false;
+    
+  
     const wsUrlInput = document.getElementById('wsUrl');
     const connectBtn = document.getElementById('connectBtn');
     const enterVrBtn = document.getElementById('enterVrBtn');
     const setRefBtn = document.getElementById('setRefBtn');
-
+  
     const wsDot = document.getElementById('wsDot');
     const wsStatus = document.getElementById('wsStatus');
     const xrDot = document.getElementById('xrDot');
     const xrStatus = document.getElementById('xrStatus');
     const refDot = document.getElementById('refDot');
     const refStatus = document.getElementById('refStatus');
-    const teleopDot = document.getElementById('teleopDot');
-    const teleopStatus = document.getElementById('teleopStatus');
     const packetView = document.getElementById('packetView');
-
+  
     let xrProgram = null;
     let xrPointBuffer = null;
     let attribPosition = null;
@@ -195,14 +241,14 @@ Local HUD balls:
     let uView = null;
     let uProjection = null;
     let uColor = null;
-
+  
     function setPill(dotEl, textEl, status, text) {
       dotEl.classList.remove('ok', 'bad');
       if (status === 'ok') dotEl.classList.add('ok');
       if (status === 'bad') dotEl.classList.add('bad');
       textEl.textContent = text;
     }
-
+  
     function sendDebug(tag, message, extra = {}) {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
       ws.send(JSON.stringify({
@@ -213,52 +259,40 @@ Local HUD balls:
         extra,
       }));
     }
-
-    function throttledDebug(tag, message, extra, key = tag) {
-      const now = performance.now();
-      if (key === 'right_missing') {
-        if (lastRightMissingDebugMs < 0 || now - lastRightMissingDebugMs >= DEBUG_THROTTLE_MS) {
-          lastRightMissingDebugMs = now;
-          sendDebug(tag, message, extra);
-        }
-        return;
-      }
-      if (key === 'pose_missing') {
-        if (lastPoseMissingDebugMs < 0 || now - lastPoseMissingDebugMs >= DEBUG_THROTTLE_MS) {
-          lastPoseMissingDebugMs = now;
-          sendDebug(tag, message, extra);
-        }
-      }
-    }
-
+  
     function matrixFromTransform(transform) {
       const m = new Float32Array(16);
       const q = transform.orientation;
       const p = transform.position;
+  
       const x = q.x, y = q.y, z = q.z, w = q.w;
       const x2 = x + x, y2 = y + y, z2 = z + z;
       const xx = x * x2, xy = x * y2, xz = x * z2;
       const yy = y * y2, yz = y * z2, zz = z * z2;
       const wx = w * x2, wy = w * y2, wz = w * z2;
+  
       m[0] = 1 - (yy + zz);
       m[1] = xy + wz;
       m[2] = xz - wy;
       m[3] = 0;
+  
       m[4] = xy - wz;
       m[5] = 1 - (xx + zz);
       m[6] = yz + wx;
       m[7] = 0;
+  
       m[8] = xz + wy;
       m[9] = yz - wx;
       m[10] = 1 - (xx + yy);
       m[11] = 0;
+  
       m[12] = p.x;
       m[13] = p.y;
       m[14] = p.z;
       m[15] = 1;
       return Array.from(m);
     }
-
+  
     function gamepadButtonsToObject(gamepad) {
       if (!gamepad || !gamepad.buttons) return {};
       const out = {};
@@ -271,39 +305,52 @@ Local HUD balls:
       });
       return out;
     }
-
+  
     function gamepadAxesToArray(gamepad) {
       if (!gamepad || !gamepad.axes) return [];
       return Array.from(gamepad.axes, x => Number(x));
     }
-
+  
     function sendPacket(packet) {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
       ws.send(JSON.stringify(packet));
     }
-
+  
     function connectWebSocket() {
-      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
+  
       ws = new WebSocket(wsUrlInput.value.trim());
       setPill(wsDot, wsStatus, '', 'WebSocket: connecting...');
+  
       ws.onopen = () => {
         setPill(wsDot, wsStatus, 'ok', 'WebSocket: connected');
         sendDebug('ws_open', 'WebSocket connected on frontend');
       };
+  
       ws.onclose = (event) => {
+        console.error('WebSocket close:', event);
         setPill(wsDot, wsStatus, 'bad', `WebSocket: closed code=${event.code}`);
         packetView.textContent = `WebSocket closed. code=${event.code} reason=${event.reason || '(empty)'}`;
       };
-      ws.onerror = () => {
+  
+      ws.onerror = (event) => {
+        console.error('WebSocket error:', event);
         setPill(wsDot, wsStatus, 'bad', 'WebSocket: error');
         packetView.textContent = 'WebSocket error. Check URL / browser security policy.';
       };
+  
+      ws.onmessage = (event) => {
+        console.log('Server:', event.data);
+      };
     }
-
+  
     function createShader(gl, type, source) {
       const shader = gl.createShader(type);
       gl.shaderSource(shader, source);
       gl.compileShader(shader);
+  
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
         console.error(gl.getShaderInfoLog(shader));
         gl.deleteShader(shader);
@@ -311,15 +358,17 @@ Local HUD balls:
       }
       return shader;
     }
-
+  
     function createProgram(gl, vsSource, fsSource) {
       const vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
       const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
       if (!vs || !fs) return null;
+  
       const program = gl.createProgram();
       gl.attachShader(program, vs);
       gl.attachShader(program, fs);
       gl.linkProgram(program);
+  
       if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
         console.error(gl.getProgramInfoLog(program));
         gl.deleteProgram(program);
@@ -327,39 +376,47 @@ Local HUD balls:
       }
       return program;
     }
-
+  
     function initXRRendering() {
       const vsSource = `
         attribute vec3 aPosition;
         uniform mat4 uModel;
         uniform mat4 uView;
         uniform mat4 uProjection;
+  
         void main() {
           gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
           gl_PointSize = 22.0;
         }
       `;
+  
       const fsSource = `
         precision mediump float;
         uniform vec4 uColor;
+  
         void main() {
           vec2 c = gl_PointCoord - vec2(0.5);
           if (dot(c, c) > 0.25) discard;
           gl_FragColor = uColor;
         }
       `;
+  
       xrProgram = createProgram(gl, vsSource, fsSource);
-      if (!xrProgram) throw new Error('Failed to create XR shader program');
+      if (!xrProgram) {
+        throw new Error('Failed to create XR shader program');
+      }
+  
       attribPosition = gl.getAttribLocation(xrProgram, 'aPosition');
       uModel = gl.getUniformLocation(xrProgram, 'uModel');
       uView = gl.getUniformLocation(xrProgram, 'uView');
       uProjection = gl.getUniformLocation(xrProgram, 'uProjection');
       uColor = gl.getUniformLocation(xrProgram, 'uColor');
+  
       xrPointBuffer = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, xrPointBuffer);
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 0]), gl.STATIC_DRAW);
     }
-
+  
     function makeTranslationMatrix(x, y, z) {
       return new Float32Array([
         1, 0, 0, 0,
@@ -383,9 +440,134 @@ Local HUD balls:
       return out;
     }
 
+    function invertMat4(m) {
+      const inv = new Float32Array(16);
+
+      inv[0] = m[5]  * m[10] * m[15] - 
+              m[5]  * m[11] * m[14] - 
+              m[9]  * m[6]  * m[15] + 
+              m[9]  * m[7]  * m[14] +
+              m[13] * m[6]  * m[11] - 
+              m[13] * m[7]  * m[10];
+
+      inv[4] = -m[4]  * m[10] * m[15] + 
+                m[4]  * m[11] * m[14] + 
+                m[8]  * m[6]  * m[15] - 
+                m[8]  * m[7]  * m[14] - 
+                m[12] * m[6]  * m[11] + 
+                m[12] * m[7]  * m[10];
+
+      inv[8] = m[4]  * m[9] * m[15] - 
+              m[4]  * m[11] * m[13] - 
+              m[8]  * m[5] * m[15] + 
+              m[8]  * m[7] * m[13] + 
+              m[12] * m[5] * m[11] - 
+              m[12] * m[7] * m[9];
+
+      inv[12] = -m[4]  * m[9] * m[14] + 
+                m[4]  * m[10] * m[13] +
+                m[8]  * m[5] * m[14] - 
+                m[8]  * m[6] * m[13] - 
+                m[12] * m[5] * m[10] + 
+                m[12] * m[6] * m[9];
+
+      inv[1] = -m[1]  * m[10] * m[15] + 
+                m[1]  * m[11] * m[14] + 
+                m[9]  * m[2] * m[15] - 
+                m[9]  * m[3] * m[14] - 
+                m[13] * m[2] * m[11] + 
+                m[13] * m[3] * m[10];
+
+      inv[5] = m[0]  * m[10] * m[15] - 
+              m[0]  * m[11] * m[14] - 
+              m[8]  * m[2] * m[15] + 
+              m[8]  * m[3] * m[14] + 
+              m[12] * m[2] * m[11] - 
+              m[12] * m[3] * m[10];
+
+      inv[9] = -m[0]  * m[9] * m[15] + 
+                m[0]  * m[11] * m[13] + 
+                m[8]  * m[1] * m[15] - 
+                m[8]  * m[3] * m[13] - 
+                m[12] * m[1] * m[11] + 
+                m[12] * m[3] * m[9];
+
+      inv[13] = m[0]  * m[9] * m[14] - 
+                m[0]  * m[10] * m[13] - 
+                m[8]  * m[1] * m[14] + 
+                m[8]  * m[2] * m[13] + 
+                m[12] * m[1] * m[10] - 
+                m[12] * m[2] * m[9];
+
+      inv[2] = m[1]  * m[6] * m[15] - 
+              m[1]  * m[7] * m[14] - 
+              m[5]  * m[2] * m[15] + 
+              m[5]  * m[3] * m[14] + 
+              m[13] * m[2] * m[7] - 
+              m[13] * m[3] * m[6];
+
+      inv[6] = -m[0]  * m[6] * m[15] + 
+                m[0]  * m[7] * m[14] + 
+                m[4]  * m[2] * m[15] - 
+                m[4]  * m[3] * m[14] - 
+                m[12] * m[2] * m[7] + 
+                m[12] * m[3] * m[6];
+
+      inv[10] = m[0]  * m[5] * m[15] - 
+                m[0]  * m[7] * m[13] - 
+                m[4]  * m[1] * m[15] + 
+                m[4]  * m[3] * m[13] + 
+                m[12] * m[1] * m[7] - 
+                m[12] * m[3] * m[5];
+
+      inv[14] = -m[0]  * m[5] * m[14] + 
+                m[0]  * m[6] * m[13] + 
+                m[4]  * m[1] * m[14] - 
+                m[4]  * m[2] * m[13] - 
+                m[12] * m[1] * m[6] + 
+                m[12] * m[2] * m[5];
+
+      inv[3] = -m[1] * m[6] * m[11] + 
+                m[1] * m[7] * m[10] + 
+                m[5] * m[2] * m[11] - 
+                m[5] * m[3] * m[10] - 
+                m[9] * m[2] * m[7] + 
+                m[9] * m[3] * m[6];
+
+      inv[7] = m[0] * m[6] * m[11] - 
+              m[0] * m[7] * m[10] - 
+              m[4] * m[2] * m[11] + 
+              m[4] * m[3] * m[10] + 
+              m[8] * m[2] * m[7] - 
+              m[8] * m[3] * m[6];
+
+      inv[11] = -m[0] * m[5] * m[11] + 
+                m[0] * m[7] * m[9] + 
+                m[4] * m[1] * m[11] - 
+                m[4] * m[3] * m[9] - 
+                m[8] * m[1] * m[7] + 
+                m[8] * m[3] * m[5];
+
+      inv[15] = m[0] * m[5] * m[10] - 
+                m[0] * m[6] * m[9] - 
+                m[4] * m[1] * m[10] + 
+                m[4] * m[2] * m[9] + 
+                m[8] * m[1] * m[6] - 
+                m[8] * m[2] * m[5];
+
+      let det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
+      if (Math.abs(det) < 1e-8) return null;
+
+      det = 1.0 / det;
+      for (let i = 0; i < 16; i++) inv[i] *= det;
+      return inv;
+    }
+
     function drawHudPoint(view, localX, localY, localZ, color) {
+      // local position is relative to the viewer/head
       const hudLocal = makeTranslationMatrix(localX, localY, localZ);
       const hudWorld = multiplyMat4(view.transform.matrix, hudLocal);
+
       gl.uniformMatrix4fv(uView, false, view.transform.inverse.matrix);
       gl.uniformMatrix4fv(uProjection, false, view.projectionMatrix);
       gl.uniformMatrix4fv(uModel, false, hudWorld);
@@ -393,26 +575,15 @@ Local HUD balls:
       gl.drawArrays(gl.POINTS, 0, 1);
     }
 
-    function drawPoint(view, x, y, z, color) {
-      const baseLayer = xrSession.renderState.baseLayer;
-      const viewport = baseLayer.getViewport(view);
-      gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
-      gl.uniformMatrix4fv(uView, false, view.transform.inverse.matrix);
-      gl.uniformMatrix4fv(uProjection, false, view.projectionMatrix);
-      gl.uniformMatrix4fv(uModel, false, makeTranslationMatrix(x, y, z));
-      gl.uniform4f(uColor, color[0], color[1], color[2], color[3]);
-      gl.drawArrays(gl.POINTS, 0, 1);
-    }
-
     function getButtonPressed(state, index) {
       return !!state?.gamepad?.buttons?.[`b${index}`]?.pressed;
     }
-
+    
     function getButtonValue(state, index) {
       const v = state?.gamepad?.buttons?.[`b${index}`]?.value;
       return Number(v || 0);
     }
-
+    
     function convertControllerState(state) {
       if (!state || !state.pose) {
         return {
@@ -427,6 +598,10 @@ Local HUD balls:
           profiles: [],
         };
       }
+    
+      const gripActive = getButtonPressed(state, 1);
+      const triggerValue = getButtonValue(state, 0);
+    
       return {
         position: {
           x: Number(state.pose.position.x),
@@ -439,8 +614,8 @@ Local HUD balls:
           z: Number(state.pose.orientation.z),
           w: Number(state.pose.orientation.w),
         },
-        gripActive: getButtonPressed(state, 1),
-        trigger: getButtonValue(state, 0),
+        gripActive,
+        trigger: triggerValue,
         buttons: state.gamepad?.buttons || {},
         axes: state.gamepad?.axes || [],
         tracked: true,
@@ -449,125 +624,144 @@ Local HUD balls:
       };
     }
 
-    function buildRefactorControllerPacket(controllerSnapshot) {
+    function buildSDKStyleControllerPacket(controllerSnapshot) {
       const rightGripPressed = getButtonPressed(controllerSnapshot.right, 1);
       const rightTriggerPressed = getButtonValue(controllerSnapshot.right, 0) > 0.5;
       const aPressed = getButtonPressed(controllerSnapshot.right, 4);
-
+    
       const gripPressedEdge = rightGripPressed && !lastRightGripPressed;
       const triggerPressedEdge = rightTriggerPressed && !lastRightTriggerPressed;
+    
       const gripReleased = (!rightGripPressed && lastRightGripPressed);
       const triggerReleased = (!rightTriggerPressed && lastRightTriggerPressed);
       const resetEvent = (aPressed && !lastAButtonPressed);
-
-      if (gripPressedEdge && controllerSnapshot.right?.pose?.matrix) {
-        refMatrix = controllerSnapshot.right.pose.matrix.slice();
-        refPosition = { ...controllerSnapshot.right.pose.position };
-        setPill(refDot, refStatus, 'ok', 'Visual ref: teleop anchor');
-      }
-
-      if (resetEvent) {
-        refMatrix = null;
-        refPosition = null;
-        setPill(refDot, refStatus, 'bad', 'Visual ref: cleared by A');
-      }
-
+    
       const packet = {
         type: 'vr_controller_state',
         timestamp_ms: performance.now(),
         frame_counter: frameCounter,
-        packet_seq: ++packetCounter,
-        hand: 'right',
+    
         leftController: convertControllerState(controllerSnapshot.left),
         rightController: convertControllerState(controllerSnapshot.right),
+    
+        hand: 'right',
         gripPressedEdge,
         gripReleased,
         triggerPressedEdge,
         triggerReleased,
         resetEvent,
       };
-
+    
       lastRightGripPressed = rightGripPressed;
       lastRightTriggerPressed = rightTriggerPressed;
       lastAButtonPressed = aPressed;
-
-      setPill(
-        teleopDot,
-        teleopStatus,
-        rightGripPressed ? 'ok' : '',
-        rightGripPressed ? 'Teleop: active (right grip)' : 'Teleop: inactive'
-      );
-
+    
       return packet;
     }
-
+    
     async function startXR() {
       if (!navigator.xr) {
         alert('WebXR is not available in this browser. Open this page in the Quest browser.');
         return;
       }
+  
       const supported = await navigator.xr.isSessionSupported(XR_MODE);
       if (!supported) {
         alert(`${XR_MODE} is not supported in this browser.`);
         return;
       }
+  
       xrSession = await navigator.xr.requestSession(XR_MODE, {
         optionalFeatures: ['local-floor', 'bounded-floor']
       });
-
+  
       const canvas = document.createElement('canvas');
       gl = canvas.getContext('webgl', { xrCompatible: true, alpha: true });
       await gl.makeXRCompatible();
-
+  
       xrSession.updateRenderState({
         baseLayer: new XRWebGLLayer(xrSession, gl, { alpha: true })
       });
+  
       xrRefSpace = await xrSession.requestReferenceSpace('local-floor');
       initXRRendering();
-
+  
       xrSession.addEventListener('end', () => {
         xrSession = null;
         xrRefSpace = null;
         setPill(xrDot, xrStatus, 'bad', 'XR: ended');
         sendDebug('xr_end', 'XR session ended on frontend');
       });
-
+  
       setPill(xrDot, xrStatus, 'ok', `XR: running (${XR_MODE})`);
       sendDebug('xr_start', 'XR session started on frontend', { mode: XR_MODE });
       xrSession.requestAnimationFrame(onXRFrame);
     }
-
+  
+    function drawPoint(view, x, y, z, color) {
+      const baseLayer = xrSession.renderState.baseLayer;
+      const viewport = baseLayer.getViewport(view);
+  
+      gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+      gl.uniformMatrix4fv(uView, false, view.transform.inverse.matrix);
+      gl.uniformMatrix4fv(uProjection, false, view.projectionMatrix);
+      gl.uniformMatrix4fv(uModel, false, makeTranslationMatrix(x, y, z));
+      gl.uniform4f(uColor, color[0], color[1], color[2], color[3]);
+      gl.drawArrays(gl.POINTS, 0, 1);
+    }
+  
     function onXRFrame(time, frame) {
       if (!xrSession) return;
       xrSession.requestAnimationFrame(onXRFrame);
       frameCounter += 1;
-
+  
       const baseLayer = xrSession.renderState.baseLayer;
       gl.bindFramebuffer(gl.FRAMEBUFFER, baseLayer.framebuffer);
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       gl.clearColor(0.0, 0.0, 0.0, 0.0);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
+  
       const viewerPose = frame.getViewerPose(xrRefSpace);
-      const controllerSnapshot = { right: null, left: null };
+  
+      const controllerSnapshot = {
+        right: null,
+        left: null,
+      };
+  
+      
+
       let rightPose = null;
       let leftPose = null;
-
+  
       for (const inputSource of xrSession.inputSources) {
         let pose = null;
         let usedSpace = null;
-
+      
         if (inputSource.gripSpace) {
           pose = frame.getPose(inputSource.gripSpace, xrRefSpace);
           usedSpace = 'grip';
         }
+      
         if (!pose && inputSource.targetRaySpace) {
           pose = frame.getPose(inputSource.targetRaySpace, xrRefSpace);
           usedSpace = 'targetRay';
         }
-        if (!pose) continue;
 
+        if (!pose) {
+          if (inputSource.handedness === 'right') {
+            sendDebug('pose_missing', 'Pose missing for input source', {
+              handedness: inputSource.handedness,
+              triedGrip: !!inputSource.gripSpace,
+              triedTargetRay: !!inputSource.targetRaySpace,
+              profiles: inputSource.profiles || [],
+            });
+          }
+          continue;
+        }
+        
+        if (!pose) continue;
+      
         const state = {
           handedness: inputSource.handedness,
           pose: {
@@ -592,6 +786,13 @@ Local HUD balls:
           profiles: inputSource.profiles || [],
         };
 
+        // sendDebug('input_source_seen', 'XR input source observed', {
+        //   handedness: inputSource.handedness,
+        //   hasGripSpace: !!inputSource.gripSpace,
+        //   hasTargetRaySpace: !!inputSource.targetRaySpace,
+        //   profiles: inputSource.profiles || [],
+        //   gamepadButtons: inputSource.gamepad?.buttons?.length || 0,
+        // });
         if (inputSource.handedness === 'right') {
           controllerSnapshot.right = state;
           rightPose = pose;
@@ -601,94 +802,149 @@ Local HUD balls:
           leftPose = pose;
         }
       }
-
+      
       lastRightControllerState = controllerSnapshot.right;
+      // Frontend-side B button edge detect: update green reference ball too
+      // const b5PressedNow = !!packet.right?.gamepad?.buttons?.b5?.pressed;
+      // const b5Edge = b5PressedNow && !lastB5Pressed;
+      
+      // if (b5Edge && packet.right?.pose?.matrix) {
+      //   refMatrix = packet.right.pose.matrix.slice();
+      //   refPosition = { ...packet.right.pose.position };
+      //   sendDebug('b5_frontend_ref_update', 'Frontend refMatrix updated by B button', {
+      //     space: packet.right.pose.space
+      //   });
+      // }
+      
+      // lastB5Pressed = b5PressedNow;
+      
+      // let refReadyThisFrame = false;
+      // let refPacketActuallySent = false;
+      
+      // if (pendingSetReference && packet.right?.pose?.matrix) {
+      //   refMatrix = packet.right.pose.matrix.slice();
+      //   refPosition = { ...packet.right.pose.position };
+      //   refReadyThisFrame = true;
+      // }
 
-      if (!controllerSnapshot.right) {
-        throttledDebug('right_not_tracked', 'Right controller not tracked in this XR frame', {}, 'right_missing');
-        throttledDebug(
-          'pose_missing',
-          'Pose missing for right input source in this XR frame',
-          {},
-          'pose_missing'
-        );
-      }
-
-      if (pendingVisualReference && controllerSnapshot.right?.pose?.matrix) {
+      if (pendingSetReference && controllerSnapshot.right?.pose?.matrix) {
         refMatrix = controllerSnapshot.right.pose.matrix.slice();
         refPosition = { ...controllerSnapshot.right.pose.position };
-        pendingVisualReference = false;
-        sendDebug('frontend_ref_set', 'Frontend visual reference updated from current right pose', {
+        pendingSetReference = false;
+      
+        sendDebug('frontend_ref_set', 'Frontend reference updated from current right pose', {
           space: controllerSnapshot.right.pose.space,
           position: refPosition,
         });
-        setPill(refDot, refStatus, 'ok', 'Visual ref: set');
+      
+        setPill(refDot, refStatus, 'ok', 'Reference: set');
       }
-
       if (viewerPose) {
         gl.useProgram(xrProgram);
         gl.bindBuffer(gl.ARRAY_BUFFER, xrPointBuffer);
         gl.enableVertexAttribArray(attribPosition);
         gl.vertexAttribPointer(attribPosition, 3, gl.FLOAT, false, 0, 0);
-
+  
         for (const view of viewerPose.views) {
           if (rightPose) {
             const p = rightPose.transform.position;
-            drawPoint(view, p.x, p.y, p.z, [0.20, 0.85, 1.00, 1.0]);
+            drawPoint(view, p.x, p.y, p.z, [0.20, 0.85, 1.00, 1.0]); // blue
           }
+  
           if (leftPose) {
             const p = leftPose.transform.position;
-            drawPoint(view, p.x, p.y, p.z, [1.00, 0.55, 0.20, 1.0]);
+            drawPoint(view, p.x, p.y, p.z, [1.00, 0.55, 0.20, 1.0]); // orange
           }
+  
           if (refMatrix) {
-            drawPoint(view, refMatrix[12], refMatrix[13], refMatrix[14], [0.30, 1.00, 0.35, 1.0]);
+            drawPoint(view, refMatrix[12], refMatrix[13], refMatrix[14], [0.30, 1.00, 0.35, 1.0]); // green
           }
 
           const wsOpen = !!(ws && ws.readyState === WebSocket.OPEN);
           const rightTracked = !!controllerSnapshot.right;
           const refSet = !!refMatrix;
 
-          const trackingColor = rightTracked ? [0.72, 0.38, 1.00, 1.0] : [0.35, 0.08, 0.08, 1.0];
-          const refColor = refSet ? [1.00, 1.00, 1.00, 1.0] : [0.35, 0.08, 0.08, 1.0];
-          const wsColor = wsOpen ? [1.00, 0.35, 0.72, 1.0] : [0.35, 0.08, 0.08, 1.0];
+          // Tracking ball:
+          // purple = tracked, dark red = not tracked
+          const trackingColor = rightTracked
+            ? [0.72, 0.38, 1.00, 1.0]   // purple
+            : [0.35, 0.08, 0.08, 1.0];  // dark red
 
-          drawHudPoint(view, -0.18,  0.12, -0.45, trackingColor);
-          drawHudPoint(view, -0.12,  0.12, -0.45, refColor);
-          drawHudPoint(view, -0.06,  0.12, -0.45, wsColor);
+          // Reference ball:
+          // white = set, yellow = pending, dark red = not set
+          let refColor = [0.35, 0.08, 0.08, 1.0]; // dark red default
+          if (refSet) {
+            refColor = [1.00, 1.00, 1.00, 1.0];   // white
+          }
+
+          // WebSocket ball:
+          // pink = connected, dark red = disconnected
+          const wsColor = wsOpen
+            ? [1.00, 0.35, 0.72, 1.0]   // pink
+            : [0.35, 0.08, 0.08, 1.0];  // dark red
+
+          // Draw three HUD balls in a row
+          // x: left->right, y: up, z: forward from head
+          drawHudPoint(view, -0.18,  0.12, -0.45, trackingColor); // left
+          drawHudPoint(view, -0.12,  0.12, -0.45, refColor);      // middle
+          drawHudPoint(view, -0.06,  0.12, -0.45, wsColor);       // right
         }
       }
+  
+      const nowMs = performance.now();
+      if (nowMs - lastSentTime >= SEND_INTERVAL_MS) {
+        lastSentTime = nowMs;
 
-      const packet = buildRefactorControllerPacket(controllerSnapshot);
-      sendPacket(packet);
+        if (!controllerSnapshot.right) {
+          sendDebug('right_not_tracked', 'Right controller not tracked in this XR frame');
+        }
 
-      const rp = controllerSnapshot.right?.pose?.position;
-      const rspace = controllerSnapshot.right?.pose?.space || 'none';
-      const gripActive = getButtonPressed(controllerSnapshot.right, 1);
-      const triggerValue = getButtonValue(controllerSnapshot.right, 0);
-      const text = rp
-        ? `VR controller state\n` +
-          `right.position = (${rp.x.toFixed(3)}, ${rp.y.toFixed(3)}, ${rp.z.toFixed(3)})\n` +
-          `right.space = ${rspace}\n` +
-          `right.gripActive = ${gripActive}\n` +
-          `right.trigger = ${triggerValue.toFixed(3)}\n` +
-          `resetEvent = ${packet.resetEvent}\n` +
-          `gripPressedEdge = ${packet.gripPressedEdge}\n` +
-          `gripReleased = ${packet.gripReleased}\n` +
-          `triggerPressedEdge = ${packet.triggerPressedEdge}\n` +
-          `triggerReleased = ${packet.triggerReleased}\n` +
-          `ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}`
-        : `VR controller state\nright controller not tracked\nws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}`;
-      packetView.textContent = text + '\n\n' + JSON.stringify(packet, null, 2);
+        const controllerPacket = buildSDKStyleControllerPacket(controllerSnapshot);
+        sendPacket(controllerPacket);
+
+        const rp = controllerSnapshot.right?.pose?.position;
+        const rspace = controllerSnapshot.right?.pose?.space || 'none';
+
+        let extraText = '';
+        if (rp && refPosition) {
+          extraText =
+            `\nref.position = (${refPosition.x.toFixed(3)}, ${refPosition.y.toFixed(3)}, ${refPosition.z.toFixed(3)})` +
+            `\ndelta = (${(rp.x - refPosition.x).toFixed(4)}, ${(rp.y - refPosition.y).toFixed(4)}, ${(rp.z - refPosition.z).toFixed(4)})`;
+        }
+
+        const gripActive = getButtonPressed(controllerSnapshot.right, 1);
+        const triggerValue = getButtonValue(controllerSnapshot.right, 0);
+
+        const text = rp
+          ? `VR controller state
+        right.position = (${rp.x.toFixed(3)}, ${rp.y.toFixed(3)}, ${rp.z.toFixed(3)})
+        right.space = ${rspace}
+        right.gripActive = ${gripActive}
+        right.trigger = ${triggerValue.toFixed(3)}
+        resetEvent = ${controllerPacket.resetEvent}
+        gripPressedEdge = ${controllerPacket.gripPressedEdge}
+        gripReleased = ${controllerPacket.gripReleased}
+        triggerPressedEdge = ${controllerPacket.triggerPressedEdge}
+        triggerReleased = ${controllerPacket.triggerReleased}
+        ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}${extraText}`
+          : `VR controller state
+        right controller not tracked
+        resetEvent = ${controllerPacket.resetEvent}
+        ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}`;
+
+        packetView.textContent = text + '\n\n' + JSON.stringify(controllerPacket, null, 2);
+      }
+  
     }
-
+  
     connectBtn.addEventListener('click', connectWebSocket);
     enterVrBtn.addEventListener('click', startXR);
     setRefBtn.addEventListener('click', () => {
-      pendingVisualReference = true;
-      sendDebug('set_reference_click', 'Set visual reference button armed on frontend');
-      setPill(refDot, refStatus, '', 'Visual ref: waiting for right pose');
+      pendingSetReference = true;
+      sendDebug('set_reference_click', 'Set Reference button armed on frontend');
+      setPill(refDot, refStatus, '', 'Reference: waiting for right pose');
     });
-
+  
     if (!('xr' in navigator)) {
       setPill(xrDot, xrStatus, 'bad', 'XR: WebXR not available here');
     }
