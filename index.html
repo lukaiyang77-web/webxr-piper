@@ -163,8 +163,7 @@
 
     function log(msg) {
       const line = '[' + new Date().toLocaleTimeString() + '] ' + msg;
-      logsEl.textContent += line + '
-';
+      logsEl.textContent += line + '\n';
       logsEl.scrollTop = logsEl.scrollHeight;
       console.log(msg);
     }
@@ -339,8 +338,7 @@
           }
         }
 
-        rawEl.textContent = lines.join('
-');
+        rawEl.textContent = lines.join('\n');
         leftEl.textContent = JSON.stringify(left, null, 2);
         rightEl.textContent = JSON.stringify(right, null, 2);
         sendState(left, right);
