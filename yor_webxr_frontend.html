@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YOR WebXR Oculus Bridge Frontend</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #141b34;
+      --panel2: #1b2446;
+      --text: #eaf0ff;
+      --muted: #9fb0dd;
+      --ok: #35c759;
+      --warn: #ffcc00;
+      --err: #ff5f57;
+      --accent: #66a3ff;
+      --border: rgba(255,255,255,0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #0b1020 0%, #0e1530 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    h1 {
+      margin: 0 0 10px 0;
+      font-size: 28px;
+      line-height: 1.2;
+    }
+    .sub {
+      color: var(--muted);
+      margin-bottom: 22px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+    }
+    .card {
+      background: rgba(20, 27, 52, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
+    }
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .row + .row { margin-top: 12px; }
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--panel2);
+      color: var(--text);
+      outline: none;
+    }
+    input:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(102,163,255,0.18);
+    }
+    .field {
+      flex: 1 1 230px;
+    }
+    button {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, #2a59d4 0%, #2349af 100%);
+      color: #fff;
+      padding: 12px 16px;
+      border-radius: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: #202949;
+    }
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      font-size: 14px;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--warn);
+      box-shadow: 0 0 10px rgba(255,204,0,0.5);
+    }
+    .dot.ok { background: var(--ok); box-shadow: 0 0 10px rgba(53,199,89,0.5); }
+    .dot.err { background: var(--err); box-shadow: 0 0 10px rgba(255,95,87,0.5); }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 12px;
+      line-height: 1.45;
+      background: rgba(0,0,0,0.18);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+      min-height: 160px;
+      max-height: 320px;
+      overflow: auto;
+    }
+    .mini {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .pill {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      background: rgba(255,255,255,0.05);
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+    .tips {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .canvas-holder {
+      margin-top: 14px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #000;
+      aspect-ratio: 16 / 9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>YOR WebXR Frontend</h1>
+    <div class="sub">Quest / Oculus controllers → WebXR → WebSocket → YOR bridge → <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">oculus_controller</span></div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="row">
+          <div class="field">
+            <label for="bridgeUrl">Bridge WebSocket URL</label>
+            <input id="bridgeUrl" value="ws://127.0.0.1:8766" />
+          </div>
+          <div class="field" style="max-width: 220px;">
+            <label for="refSpace">Reference Space</label>
+            <select id="refSpace">
+              <option value="local-floor" selected>local-floor</option>
+              <option value="local">local</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <button id="connectBridgeBtn" class="secondary">Connect Bridge</button>
+          <button id="startVrBtn">Enter VR</button>
+          <button id="stopVrBtn" class="secondary" disabled>Exit VR</button>
+          <div id="bridgeStatus" class="status"><span class="dot"></span><span>Bridge disconnected</span></div>
+          <div id="xrStatus" class="status"><span class="dot"></span><span>XR idle</span></div>
+        </div>
+
+        <div class="canvas-holder" id="canvasHolder">
+          <span id="canvasPlaceholder">WebXR session not started</span>
+          <canvas id="glCanvas" style="display:none"></canvas>
+        </div>
+
+        <div class="mini">
+          <div>
+            <label>Left controller</label>
+            <div id="leftState" class="mono">No data yet.</div>
+          </div>
+          <div>
+            <label>Right controller</label>
+            <div id="rightState" class="mono">No data yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <span class="pill">A = right btn0</span>
+          <span class="pill">B = right btn1</span>
+          <span class="pill">X = left btn0</span>
+          <span class="pill">Y = left btn1</span>
+        </div>
+        <div class="row">
+          <span class="pill">Trigger = index_trigger</span>
+          <span class="pill">Squeeze = hand_trigger</span>
+          <span class="pill">Stick press = thumbstick</span>
+        </div>
+        <div class="row tips">
+          Use HTTPS or localhost. WebXR usually will not start from plain HTTP.<br />
+          The bridge URL should point to the machine running <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">yor_oculus_bridge.py</span>.<br />
+          This page sends controller poses as <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">local_position</span> and <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">local_rotation[x,y,z,w]</span> every XR frame.
+        </div>
+        <div style="margin-top:14px;">
+          <label>Logs</label>
+          <div id="log" class="mono"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const bridgeUrlEl = document.getElementById('bridgeUrl');
+    const refSpaceEl = document.getElementById('refSpace');
+    const connectBridgeBtn = document.getElementById('connectBridgeBtn');
+    const startVrBtn = document.getElementById('startVrBtn');
+    const stopVrBtn = document.getElementById('stopVrBtn');
+    const bridgeStatusEl = document.getElementById('bridgeStatus');
+    const xrStatusEl = document.getElementById('xrStatus');
+    const leftStateEl = document.getElementById('leftState');
+    const rightStateEl = document.getElementById('rightState');
+    const logEl = document.getElementById('log');
+    const canvas = document.getElementById('glCanvas');
+    const canvasPlaceholder = document.getElementById('canvasPlaceholder');
+
+    let ws = null;
+    let xrSession = null;
+    let xrRefSpace = null;
+    let gl = null;
+    let sendingEnabled = true;
+    let lastSentAt = 0;
+    const minSendIntervalMs = 16; // about 60Hz
+
+    function log(msg) {
+      const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logEl.textContent += line + '\n';
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log(msg);
+    }
+
+    function setStatus(el, text, state = 'idle') {
+      const dot = el.querySelector('.dot');
+      const span = el.querySelector('span:last-child');
+      span.textContent = text;
+      dot.classList.remove('ok', 'err');
+      if (state === 'ok') dot.classList.add('ok');
+      if (state === 'err') dot.classList.add('err');
+    }
+
+    function connectBridge() {
+      const url = bridgeUrlEl.value.trim();
+      if (!url) {
+        log('Bridge URL is empty');
+        return;
+      }
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        log('Bridge already connected or connecting');
+        return;
+      }
+      ws = new WebSocket(url);
+      setStatus(bridgeStatusEl, 'Bridge connecting...', 'idle');
+      ws.onopen = () => {
+        setStatus(bridgeStatusEl, 'Bridge connected', 'ok');
+        log(`Bridge connected: ${url}`);
+      };
+      ws.onclose = () => {
+        setStatus(bridgeStatusEl, 'Bridge disconnected', 'err');
+        log('Bridge disconnected');
+      };
+      ws.onerror = (e) => {
+        setStatus(bridgeStatusEl, 'Bridge error', 'err');
+        log('Bridge websocket error');
+        console.error(e);
+      };
+      ws.onmessage = (e) => {
+        log(`Bridge says: ${e.data}`);
+      };
+    }
+
+    function safeVec(arr, n, fill = 0) {
+      if (!Array.isArray(arr) || arr.length !== n) {
+        return Array(n).fill(fill);
+      }
+      return arr.map(v => Number.isFinite(v) ? v : fill);
+    }
+
+    function normalizeButtonValue(button) {
+      if (!button) return 0;
+      if (typeof button === 'number') return button;
+      return Number(button.value || 0);
+    }
+
+    function normalizePressed(button) {
+      if (!button) return false;
+      if (typeof button === 'number') return button > 0.5;
+      return !!button.pressed;
+    }
+
+    function makeEmptySide(handedness) {
+      return handedness === 'left'
+        ? {
+            x: false,
+            y: false,
+            menu: false,
+            thumbstick: false,
+            index_trigger: 0,
+            hand_trigger: 0,
+            thumbstick_axes: [0, 0],
+            local_position: [0, 0, 0],
+            local_rotation: [0, 0, 0, 1]
+          }
+        : {
+            a: false,
+            b: false,
+            menu: false,
+            thumbstick: false,
+            index_trigger: 0,
+            hand_trigger: 0,
+            thumbstick_axes: [0, 0],
+            local_position: [0, 0, 0],
+            local_rotation: [0, 0, 0, 1]
+          };
+    }
+
+    function extractControllerState(inputSource, frame, refSpace) {
+      const handedness = inputSource.handedness || 'unknown';
+      const gp = inputSource.gamepad;
+      const side = makeEmptySide(handedness === 'left' ? 'left' : 'right');
+
+      if (gp) {
+        const axes = Array.from(gp.axes || []);
+        // Common Oculus mapping: 0/1 thumbstick axes, 0 trigger, 1 squeeze, 4/5 ABXY, 3 thumbstick press.
+        side.index_trigger = normalizeButtonValue(gp.buttons?.[0]);
+        side.hand_trigger = normalizeButtonValue(gp.buttons?.[1]);
+        side.thumbstick_axes = safeVec([axes[2] ?? axes[0] ?? 0, axes[3] ?? axes[1] ?? 0], 2, 0);
+
+        if (handedness === 'left') {
+          side.x = normalizePressed(gp.buttons?.[4]);
+          side.y = normalizePressed(gp.buttons?.[5]);
+          side.menu = normalizePressed(gp.buttons?.[6]);
+          side.thumbstick = normalizePressed(gp.buttons?.[3]);
+        } else {
+          side.a = normalizePressed(gp.buttons?.[4]);
+          side.b = normalizePressed(gp.buttons?.[5]);
+          side.menu = normalizePressed(gp.buttons?.[6]);
+          side.thumbstick = normalizePressed(gp.buttons?.[3]);
+        }
+      }
+
+      const pose = frame.getPose(inputSource.gripSpace || inputSource.targetRaySpace, refSpace);
+      if (pose) {
+        const p = pose.transform.position;
+        const q = pose.transform.orientation;
+        side.local_position = [p.x, p.y, p.z];
+        side.local_rotation = [q.x, q.y, q.z, q.w];
+      }
+
+      return side;
+    }
+
+    function renderSide(el, side) {
+      el.textContent = JSON.stringify(side, null, 2);
+    }
+
+    function sendControllerState(payload) {
+      if (!sendingEnabled) return;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      const now = performance.now();
+      if (now - lastSentAt < minSendIntervalMs) return;
+      lastSentAt = now;
+      ws.send(JSON.stringify(payload));
+    }
+
+    async function startXR() {
+      if (!('xr' in navigator)) {
+        log('WebXR not supported in this browser');
+        setStatus(xrStatusEl, 'XR unsupported', 'err');
+        return;
+      }
+
+      const supported = await navigator.xr.isSessionSupported('immersive-vr');
+      if (!supported) {
+        log('immersive-vr is not supported on this device/browser');
+        setStatus(xrStatusEl, 'XR unsupported', 'err');
+        return;
+      }
+
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        log('Bridge is not connected yet; connecting now');
+        connectBridge();
+      }
+
+      xrSession = await navigator.xr.requestSession('immersive-vr', {
+        optionalFeatures: ['local-floor', 'local', 'bounded-floor', 'hand-tracking']
+      });
+
+      canvas.style.display = 'block';
+      canvasPlaceholder.style.display = 'none';
+      gl = canvas.getContext('webgl', { xrCompatible: true, antialias: true, alpha: false });
+      await gl.makeXRCompatible();
+
+      xrSession.updateRenderState({
+        baseLayer: new XRWebGLLayer(xrSession, gl)
+      });
+
+      try {
+        xrRefSpace = await xrSession.requestReferenceSpace(refSpaceEl.value);
+      } catch (e) {
+        log(`Failed to request ${refSpaceEl.value}, fallback to local`);
+        xrRefSpace = await xrSession.requestReferenceSpace('local');
+      }
+
+      xrSession.addEventListener('end', () => {
+        xrSession = null;
+        xrRefSpace = null;
+        stopVrBtn.disabled = true;
+        startVrBtn.disabled = false;
+        setStatus(xrStatusEl, 'XR idle', 'idle');
+        canvas.style.display = 'none';
+        canvasPlaceholder.style.display = 'block';
+        log('XR session ended');
+      });
+
+      stopVrBtn.disabled = false;
+      startVrBtn.disabled = true;
+      setStatus(xrStatusEl, 'XR running', 'ok');
+      log('XR session started');
+
+      const onXRFrame = (time, frame) => {
+        const session = frame.session;
+        session.requestAnimationFrame(onXRFrame);
+
+        const pose = frame.getViewerPose(xrRefSpace);
+        if (!pose) return;
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, session.renderState.baseLayer.framebuffer);
+        gl.clearColor(0.02, 0.03, 0.06, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        let left = makeEmptySide('left');
+        let right = makeEmptySide('right');
+
+        for (const inputSource of session.inputSources) {
+          if (inputSource.handedness !== 'left' && inputSource.handedness !== 'right') continue;
+          const side = extractControllerState(inputSource, frame, xrRefSpace);
+          if (inputSource.handedness === 'left') left = side;
+          if (inputSource.handedness === 'right') right = side;
+        }
+
+        renderSide(leftStateEl, left);
+        renderSide(rightStateEl, right);
+        sendControllerState({ left, right });
+      };
+
+      xrSession.requestAnimationFrame(onXRFrame);
+    }
+
+    async function stopXR() {
+      if (xrSession) {
+        await xrSession.end();
+      }
+    }
+
+    connectBridgeBtn.addEventListener('click', connectBridge);
+    startVrBtn.addEventListener('click', () => {
+      startXR().catch((e) => {
+        setStatus(xrStatusEl, 'XR error', 'err');
+        log(`XR start failed: ${e.message}`);
+        console.error(e);
+      });
+    });
+    stopVrBtn.addEventListener('click', () => {
+      stopXR().catch((e) => {
+        log(`XR stop failed: ${e.message}`);
+        console.error(e);
+      });
+    });
+
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+      log('Warning: WebXR usually requires HTTPS or localhost.');
+    }
+  </script>
+</body>
+</html>
