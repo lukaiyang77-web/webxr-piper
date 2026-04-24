@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>YOR WebXR AR Debug V1.2</title>
+  <title>YOR WebXR AR Debug</title>
   <style>
     :root {
       --bg: #0f172a;
@@ -133,7 +133,7 @@
   <canvas id="xrCanvas"></canvas>
 
   <div class="wrap">
-    <h1>YOR WebXR AR Debug V1.2</h1>
+    <h1>YOR WebXR AR Debug</h1>
     <div class="sub">Minimal page for Quest passthrough AR + bridge debug</div>
 
     <div class="card">
@@ -375,11 +375,15 @@
           if (!target) continue;
 
           if (poseData) {
-            target.local_position = [
-              poseData.transform.position.x,
-              poseData.transform.position.y,
-              poseData.transform.position.z
-            ];
+            const px = poseData.transform.position.x;
+            const py = poseData.transform.position.y;
+            const pz = poseData.transform.position.z;
+
+            // Axis mapping only: keep rotation unchanged
+            // robot_x = -webxr_z
+            // robot_y = -webxr_x
+            // robot_z =  webxr_y
+            target.local_position = [-pz, -px, py];
             target.local_rotation = [
               poseData.transform.orientation.x,
               poseData.transform.orientation.y,
