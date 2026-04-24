@@ -179,8 +179,8 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>YOR WebXR Frontend</h1>
-    <div class="sub">Quest / Oculus controllers → WebXR → WebSocket → YOR bridge → <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">oculus_controller</span></div>
+    <h1>YOR WebXR AR Frontend</h1>
+    <div class="sub">Quest / Oculus controllers → WebXR passthrough AR → WebSocket → YOR bridge → <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">oculus_controller</span></div>
 
     <div class="grid">
       <div class="card">
@@ -200,14 +200,14 @@
 
         <div class="row">
           <button id="connectBridgeBtn" class="secondary">Connect Bridge</button>
-          <button id="startVrBtn">Enter VR</button>
-          <button id="stopVrBtn" class="secondary" disabled>Exit VR</button>
+          <button id="startVrBtn">Enter AR</button>
+          <button id="stopVrBtn" class="secondary" disabled>Exit AR</button>
           <div id="bridgeStatus" class="status"><span class="dot"></span><span>Bridge disconnected</span></div>
           <div id="xrStatus" class="status"><span class="dot"></span><span>XR idle</span></div>
         </div>
 
         <div class="canvas-holder" id="canvasHolder">
-          <span id="canvasPlaceholder">WebXR session not started</span>
+          <span id="canvasPlaceholder">WebXR AR session not started</span>
           <canvas id="glCanvas" style="display:none"></canvas>
         </div>
 
@@ -236,9 +236,10 @@
           <span class="pill">Stick press = thumbstick</span>
         </div>
         <div class="row tips">
-          Use HTTPS or localhost. WebXR usually will not start from plain HTTP.<br />
+          Use HTTPS or localhost. AR passthrough on Quest requires a secure context.<br />
           The bridge URL should point to the machine running <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">yor_oculus_bridge.py</span>.<br />
-          This page sends controller poses as <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">local_position</span> and <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">local_rotation[x,y,z,w]</span> every XR frame.
+          This page requests <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">immersive-ar</span> and keeps the background transparent so you can see the real robot.<br />
+          Controller poses are sent as <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">local_position</span> and <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">local_rotation[x,y,z,w]</span> every XR frame.
         </div>
         <div style="margin-top:14px;">
           <label>Logs</label>
@@ -507,9 +508,9 @@
         return;
       }
 
-      const supported = await navigator.xr.isSessionSupported('immersive-vr');
+      const supported = await navigator.xr.isSessionSupported('immersive-ar');
       if (!supported) {
-        log('immersive-vr is not supported on this device/browser');
+        log('immersive-ar is not supported on this device/browser');
         setStatus(xrStatusEl, 'XR unsupported', 'err');
         return;
       }
@@ -519,13 +520,13 @@
         connectBridge();
       }
 
-      xrSession = await navigator.xr.requestSession('immersive-vr', {
-        optionalFeatures: ['local-floor', 'local', 'bounded-floor', 'hand-tracking']
+      xrSession = await navigator.xr.requestSession('immersive-ar', {
+        optionalFeatures: ['local-floor', 'local', 'bounded-floor', 'hand-tracking', 'plane-detection']
       });
 
       canvas.style.display = 'block';
       canvasPlaceholder.style.display = 'none';
-      gl = canvas.getContext('webgl', { xrCompatible: true, antialias: true, alpha: false });
+      gl = canvas.getContext('webgl', { xrCompatible: true, antialias: true, alpha: true, premultipliedAlpha: false });
       await gl.makeXRCompatible();
       initSimpleRenderer(gl);
 
@@ -554,7 +555,7 @@
       stopVrBtn.disabled = false;
       startVrBtn.disabled = true;
       setStatus(xrStatusEl, 'XR running', 'ok');
-      log('XR session started');
+      log('AR passthrough session started');
 
       const onXRFrame = (time, frame) => {
         const session = frame.session;
@@ -565,6 +566,8 @@
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, session.renderState.baseLayer.framebuffer);
         gl.enable(gl.SCISSOR_TEST);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
         let left = makeEmptySide('left');
         let right = makeEmptySide('right');
@@ -588,17 +591,18 @@
           gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
           gl.scissor(viewport.x, viewport.y, viewport.width, viewport.height);
 
-          gl.clearColor(0.08, 0.11, 0.18, 1.0);
+          gl.clearColor(0.0, 0.0, 0.0, 0.0);
           gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-          drawLines(gl, centerCrossVertices(0.035), [0.95, 0.97, 1.0, 1.0], gl.LINES);
+          drawLines(gl, centerCrossVertices(0.025), [1.0, 1.0, 1.0, 0.95], gl.LINES);
 
-          const leftVerts = controllerMarkerVertices(left.local_position, 0.028);
-          const rightVerts = controllerMarkerVertices(right.local_position, 0.028);
-          if (leftVerts.length) drawLines(gl, leftVerts, [0.25, 0.82, 0.45, 1.0], gl.LINES);
-          if (rightVerts.length) drawLines(gl, rightVerts, [0.38, 0.64, 1.0, 1.0], gl.LINES);
+          const leftVerts = controllerMarkerVertices(left.local_position, 0.022);
+          const rightVerts = controllerMarkerVertices(right.local_position, 0.022);
+          if (leftVerts.length) drawLines(gl, leftVerts, [0.25, 0.82, 0.45, 0.95], gl.LINES);
+          if (rightVerts.length) drawLines(gl, rightVerts, [0.38, 0.64, 1.0, 0.95], gl.LINES);
         }
 
+        gl.disable(gl.BLEND);
         gl.disable(gl.SCISSOR_TEST);
       };
 
@@ -615,7 +619,7 @@
     startVrBtn.addEventListener('click', () => {
       startXR().catch((e) => {
         setStatus(xrStatusEl, 'XR error', 'err');
-        log(`XR start failed: ${e.message}`);
+        log(`AR start failed: ${e.message}`);
         console.error(e);
       });
     });
@@ -627,7 +631,7 @@
     });
 
     if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-      log('Warning: WebXR usually requires HTTPS or localhost.');
+      log('Warning: WebXR AR usually requires HTTPS or localhost.');
     }
   </script>
 </body>
