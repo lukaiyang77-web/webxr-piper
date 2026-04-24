@@ -3,174 +3,101 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>YOR WebXR Oculus Bridge Frontend V1</title>
+  <title>YOR WebXR AR Debug</title>
   <style>
-    :root {
-      --bg: #0b1020;
-      --panel: #141b34;
-      --panel2: #1b2446;
-      --text: #eaf0ff;
-      --muted: #9fb0dd;
-      --ok: #35c759;
-      --warn: #ffcc00;
-      --err: #ff5f57;
-      --accent: #66a3ff;
-      --border: rgba(255,255,255,0.12);
-    }
-    * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: linear-gradient(180deg, #0b1020 0%, #0e1530 100%);
-      color: var(--text);
-      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f172a;
+      color: #e5e7eb;
     }
     .wrap {
-      max-width: 1100px;
+      max-width: 980px;
       margin: 0 auto;
-      padding: 24px;
+      padding: 20px;
     }
-    h1 {
-      margin: 0 0 10px 0;
-      font-size: 28px;
-      line-height: 1.2;
-    }
-    .sub {
-      color: var(--muted);
-      margin-bottom: 22px;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: 1.1fr 0.9fr;
-      gap: 18px;
-    }
+    h1 { margin: 0 0 10px 0; }
+    .sub { color: #94a3b8; margin-bottom: 18px; }
     .card {
-      background: rgba(20, 27, 52, 0.92);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 18px;
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
+      background: #111827;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 16px;
     }
     .row {
       display: flex;
-      gap: 10px;
       flex-wrap: wrap;
+      gap: 10px;
       align-items: center;
+      margin-bottom: 12px;
     }
-    .row + .row { margin-top: 12px; }
     label {
       display: block;
       font-size: 13px;
-      color: var(--muted);
+      color: #94a3b8;
       margin-bottom: 6px;
     }
-    input, select {
+    input {
       width: 100%;
       padding: 10px 12px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: var(--panel2);
-      color: var(--text);
-      outline: none;
-    }
-    input:focus, select:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(102,163,255,0.18);
+      border-radius: 10px;
+      border: 1px solid #475569;
+      background: #0b1220;
+      color: #e5e7eb;
+      box-sizing: border-box;
     }
     .field {
-      flex: 1 1 230px;
+      flex: 1 1 320px;
     }
     button {
-      appearance: none;
-      border: 1px solid var(--border);
-      background: linear-gradient(180deg, #2a59d4 0%, #2349af 100%);
-      color: #fff;
-      padding: 12px 16px;
-      border-radius: 14px;
-      font-weight: 600;
+      border: 1px solid #475569;
+      background: #2563eb;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 12px;
       cursor: pointer;
+      font-weight: 600;
     }
     button.secondary {
-      background: #202949;
-    }
-    button:disabled {
-      opacity: 0.55;
-      cursor: not-allowed;
+      background: #1f2937;
     }
     .status {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 8px 12px;
+      padding: 8px 10px;
       border-radius: 999px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid var(--border);
+      border: 1px solid #475569;
+      background: #0b1220;
       font-size: 14px;
     }
     .dot {
       width: 10px;
       height: 10px;
       border-radius: 999px;
-      background: var(--warn);
-      box-shadow: 0 0 10px rgba(255,204,0,0.5);
+      background: #f59e0b;
     }
-    .dot.ok { background: var(--ok); box-shadow: 0 0 10px rgba(53,199,89,0.5); }
-    .dot.err { background: var(--err); box-shadow: 0 0 10px rgba(255,95,87,0.5); }
-    .mono {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      white-space: pre-wrap;
-      word-break: break-word;
-      font-size: 12px;
-      line-height: 1.45;
-      background: rgba(0,0,0,0.18);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 12px;
-      min-height: 160px;
-      max-height: 320px;
-      overflow: auto;
-    }
-    .mini {
+    .dot.ok { background: #22c55e; }
+    .dot.err { background: #ef4444; }
+    .grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 12px;
-      margin-top: 12px;
     }
-    .pill {
-      display: inline-flex;
-      gap: 6px;
-      align-items: center;
-      padding: 6px 10px;
-      border-radius: 999px;
+    .mono {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 12px;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      background: rgba(255,255,255,0.05);
-      margin-right: 8px;
-      margin-bottom: 8px;
-    }
-    .tips {
-      color: var(--muted);
-      font-size: 14px;
-      line-height: 1.6;
-    }
-    .canvas-holder {
-      margin-top: 14px;
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-      background: #000;
-      aspect-ratio: 16 / 9;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--muted);
-      font-size: 14px;
-    }
-    canvas {
-      width: 100%;
-      height: 100%;
-      display: block;
+      line-height: 1.45;
+      background: #020617;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 12px;
+      min-height: 150px;
+      max-height: 300px;
+      overflow: auto;
     }
     @media (max-width: 900px) {
       .grid { grid-template-columns: 1fr; }
@@ -179,529 +106,277 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>YOR WebXR AR Frontend V1</h1>
-    <div class="sub">Quest / Oculus controllers → WebXR passthrough AR → WebSocket → YOR bridge → <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">oculus_controller</span></div>
+    <h1>YOR WebXR AR Debug V1.1</h1>
+    <div class="sub">Minimal page for Quest passthrough AR + bridge debug</div>
+
+    <div class="card">
+      <div class="row">
+        <div class="field">
+          <label for="bridgeUrl">Bridge URL</label>
+          <input id="bridgeUrl" value="wss://automobiles-tests-paying-rounds.trycloudflare.com" />
+        </div>
+      </div>
+      <div class="row">
+        <button id="connectBtn">Connect Bridge</button>
+        <button id="enterArBtn">Enter AR</button>
+        <button id="exitArBtn" class="secondary">Exit AR</button>
+        <div id="bridgeStatus" class="status"><span class="dot"></span><span>Bridge disconnected</span></div>
+        <div id="xrStatus" class="status"><span class="dot"></span><span>XR idle</span></div>
+      </div>
+    </div>
 
     <div class="grid">
       <div class="card">
-        <div class="row">
-          <div class="field">
-            <label for="bridgeUrl">Bridge WebSocket URL</label>
-            <input id="bridgeUrl" value="ws://127.0.0.1:8766" />
-          </div>
-          <div class="field" style="max-width: 220px;">
-            <label for="refSpace">Reference Space</label>
-            <select id="refSpace">
-              <option value="local-floor" selected>local-floor</option>
-              <option value="local">local</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="row">
-          <button id="connectBridgeBtn" class="secondary">Connect Bridge</button>
-          <button id="startVrBtn">Enter AR</button>
-          <button id="stopVrBtn" class="secondary" disabled>Exit AR</button>
-          <div id="bridgeStatus" class="status"><span class="dot"></span><span>Bridge disconnected</span></div>
-          <div id="xrStatus" class="status"><span class="dot"></span><span>XR idle</span></div>
-        </div>
-
-        <div class="canvas-holder" id="canvasHolder">
-          <span id="canvasPlaceholder">WebXR AR session not started</span>
-          <canvas id="glCanvas" style="display:none"></canvas>
-        </div>
-
-        <div class="mini">
-          <div>
-            <label>XR raw debug</label>
-            <div id="xrRawDebug" class="mono">No XR raw data yet.</div>
-          </div>
-          <div>
-            <label>Left controller</label>
-            <div id="leftState" class="mono">No data yet.</div>
-          </div>
-          <div>
-            <label>Right controller</label>
-            <div id="rightState" class="mono">No data yet.</div>
-          </div>
-        </div>
+        <label>Logs</label>
+        <div id="logs" class="mono"></div>
       </div>
-
       <div class="card">
-        <div class="row">
-          <span class="pill">A = right btn0</span>
-          <span class="pill">B = right btn1</span>
-          <span class="pill">X = left btn0</span>
-          <span class="pill">Y = left btn1</span>
-        </div>
-        <div class="row">
-          <span class="pill">Trigger = index_trigger</span>
-          <span class="pill">Squeeze = hand_trigger</span>
-          <span class="pill">Stick press = thumbstick</span>
-        </div>
-        <div class="row tips">
-          Use HTTPS or localhost. AR passthrough on Quest requires a secure context.<br />
-          The bridge URL should point to the machine running <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">yor_oculus_bridge.py</span>.<br />
-          This page requests <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">immersive-ar</span> and keeps the background transparent so you can see the real robot.<br />
-          Controller poses are sent as <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">local_position</span> and <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">local_rotation[x,y,z,w]</span> every XR frame.
-        </div>
-        <div style="margin-top:14px;">
-          <label>Logs</label>
-          <div id="log" class="mono"></div>
-        </div>
+        <label>XR raw debug</label>
+        <div id="raw" class="mono"></div>
+      </div>
+      <div class="card">
+        <label>Left controller</label>
+        <div id="left" class="mono"></div>
+      </div>
+      <div class="card">
+        <label>Right controller</label>
+        <div id="right" class="mono"></div>
       </div>
     </div>
   </div>
 
   <script>
+    const logsEl = document.getElementById('logs');
+    const rawEl = document.getElementById('raw');
+    const leftEl = document.getElementById('left');
+    const rightEl = document.getElementById('right');
     const bridgeUrlEl = document.getElementById('bridgeUrl');
-
-    window.addEventListener('error', (event) => {
-      try {
-        log(`[window.error] ${event.message} @ ${event.filename || 'unknown'}:${event.lineno || 0}`);
-      } catch (_) {}
-      console.error(event.error || event.message || event);
-    });
-
-    window.addEventListener('unhandledrejection', (event) => {
-      try {
-        log(`[unhandledrejection] ${event.reason?.message || event.reason || 'unknown rejection'}`);
-      } catch (_) {}
-      console.error(event.reason || event);
-    });
-    const refSpaceEl = document.getElementById('refSpace');
-    const connectBridgeBtn = document.getElementById('connectBridgeBtn');
-    const startVrBtn = document.getElementById('startVrBtn');
-    const stopVrBtn = document.getElementById('stopVrBtn');
+    const connectBtn = document.getElementById('connectBtn');
+    const enterArBtn = document.getElementById('enterArBtn');
+    const exitArBtn = document.getElementById('exitArBtn');
     const bridgeStatusEl = document.getElementById('bridgeStatus');
     const xrStatusEl = document.getElementById('xrStatus');
-    const leftStateEl = document.getElementById('leftState');
-    const rightStateEl = document.getElementById('rightState');
-    const xrRawDebugEl = document.getElementById('xrRawDebug');
-    const logEl = document.getElementById('log');
-    const canvas = document.getElementById('glCanvas');
-
-    function compileShader(gl, type, source) {
-      const shader = gl.createShader(type);
-      gl.shaderSource(shader, source);
-      gl.compileShader(shader);
-      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        const info = gl.getShaderInfoLog(shader);
-        gl.deleteShader(shader);
-        throw new Error(`Shader compile failed: ${info}`);
-      }
-      return shader;
-    }
-
-    function createProgram(gl, vertexSource, fragmentSource) {
-      const vs = compileShader(gl, gl.VERTEX_SHADER, vertexSource);
-      const fs = compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
-      const program = gl.createProgram();
-      gl.attachShader(program, vs);
-      gl.attachShader(program, fs);
-      gl.linkProgram(program);
-      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-        const info = gl.getProgramInfoLog(program);
-        gl.deleteProgram(program);
-        throw new Error(`Program link failed: ${info}`);
-      }
-      return program;
-    }
-
-    let lineProgram = null;
-    let lineBuffer = null;
-    let linePosLoc = null;
-    let lineColorLoc = null;
-
-    function initSimpleRenderer(gl) {
-      if (lineProgram) return;
-      const vertexSource = `
-        attribute vec2 a_position;
-        void main() {
-          gl_Position = vec4(a_position, 0.0, 1.0);
-        }
-      `;
-      const fragmentSource = `
-        precision mediump float;
-        uniform vec4 u_color;
-        void main() {
-          gl_FragColor = u_color;
-        }
-      `;
-      lineProgram = createProgram(gl, vertexSource, fragmentSource);
-      lineBuffer = gl.createBuffer();
-      linePosLoc = gl.getAttribLocation(lineProgram, 'a_position');
-      lineColorLoc = gl.getUniformLocation(lineProgram, 'u_color');
-    }
-
-    function drawLines(gl, vertices, color, mode = gl.LINES) {
-      if (!lineProgram) return;
-      gl.useProgram(lineProgram);
-      gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
-      gl.enableVertexAttribArray(linePosLoc);
-      gl.vertexAttribPointer(linePosLoc, 2, gl.FLOAT, false, 0, 0);
-      gl.uniform4fv(lineColorLoc, color);
-      gl.drawArrays(mode, 0, vertices.length / 2);
-    }
-
-    function poseToScreen(pos) {
-      if (!Array.isArray(pos) || pos.length !== 3) return null;
-      const x = Math.max(-0.95, Math.min(0.95, pos[0] * 1.4));
-      const y = Math.max(-0.95, Math.min(0.95, 0.15 + pos[1] * 1.4));
-      return [x, y];
-    }
-
-    function controllerMarkerVertices(pos, size = 0.03) {
-      const p = poseToScreen(pos);
-      if (!p) return [];
-      const [x, y] = p;
-      return [
-        x - size, y, x + size, y,
-        x, y - size, x, y + size,
-      ];
-    }
-
-    function centerCrossVertices(size = 0.03) {
-      return [
-        -size, 0, size, 0,
-        0, -size, 0, size,
-      ];
-    }
-    const canvasPlaceholder = document.getElementById('canvasPlaceholder');
 
     let ws = null;
     let xrSession = null;
     let xrRefSpace = null;
-    let gl = null;
-    let latestLeft = null;
-    let latestRight = null;
-    let sendingEnabled = true;
-    let lastSentAt = 0;
-    const minSendIntervalMs = 16; // about 60Hz
 
     function log(msg) {
-      const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
-      logEl.textContent += line + '\n';
-      logEl.scrollTop = logEl.scrollHeight;
+      const line = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+      logsEl.textContent += line + '
+';
+      logsEl.scrollTop = logsEl.scrollHeight;
       console.log(msg);
     }
 
-    function setStatus(el, text, state = 'idle') {
+    function setStatus(el, text, state) {
       const dot = el.querySelector('.dot');
-      const span = el.querySelector('span:last-child');
-      span.textContent = text;
+      const label = el.querySelector('span:last-child');
       dot.classList.remove('ok', 'err');
       if (state === 'ok') dot.classList.add('ok');
       if (state === 'err') dot.classList.add('err');
+      label.textContent = text;
+    }
+
+    window.onerror = function(message, source, lineno) {
+      log('window.onerror: ' + message + ' @ ' + source + ':' + lineno);
+    };
+
+    window.onunhandledrejection = function(event) {
+      const reason = event.reason && event.reason.message ? event.reason.message : String(event.reason);
+      log('unhandledrejection: ' + reason);
+    };
+
+    function makeEmptyLeft() {
+      return {
+        x: false,
+        y: false,
+        menu: false,
+        thumbstick: false,
+        index_trigger: 0,
+        hand_trigger: 0,
+        thumbstick_axes: [0, 0],
+        local_position: [0, 0, 0],
+        local_rotation: [0, 0, 0, 1]
+      };
+    }
+
+    function makeEmptyRight() {
+      return {
+        a: false,
+        b: false,
+        menu: false,
+        thumbstick: false,
+        index_trigger: 0,
+        hand_trigger: 0,
+        thumbstick_axes: [0, 0],
+        local_position: [0, 0, 0],
+        local_rotation: [0, 0, 0, 1]
+      };
+    }
+
+    function num(v, d) {
+      const x = Number(v);
+      return Number.isFinite(x) ? x : d;
+    }
+
+    function sendState(left, right) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({ left, right }));
     }
 
     function connectBridge() {
+      const url = bridgeUrlEl.value.trim();
+      log('connectBridge() url=' + url);
+      if (!url) {
+        log('Bridge URL empty');
+        return;
+      }
       try {
-        const url = bridgeUrlEl.value.trim();
-        log(`connectBridge() called, url=${url || '(empty)'}`);
-        if (!url) {
-          log('Bridge URL is empty');
-          return;
-        }
-        if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-          log('Bridge already connected or connecting');
-          return;
-        }
         ws = new WebSocket(url);
-        setStatus(bridgeStatusEl, 'Bridge connecting...', 'idle');
-        ws.onopen = () => {
-          setStatus(bridgeStatusEl, 'Bridge connected', 'ok');
-          log(`Bridge connected: ${url}`);
-        };
-        ws.onclose = (e) => {
-          setStatus(bridgeStatusEl, 'Bridge disconnected', 'err');
-          log(`Bridge disconnected code=${e.code} reason=${e.reason || '(none)'}`);
-        };
-        ws.onerror = (e) => {
-          setStatus(bridgeStatusEl, 'Bridge error', 'err');
-          log('Bridge websocket error');
-          console.error(e);
-        };
-        ws.onmessage = (e) => {
-          log(`Bridge says: ${e.data}`);
-        };
       } catch (e) {
-        log(`connectBridge() threw: ${e.message}`);
-        console.error(e);
+        log('WebSocket constructor failed: ' + e.message);
+        return;
       }
+      setStatus(bridgeStatusEl, 'Bridge connecting...', '');
+      ws.onopen = function() {
+        setStatus(bridgeStatusEl, 'Bridge connected', 'ok');
+        log('Bridge connected');
+      };
+      ws.onclose = function(e) {
+        setStatus(bridgeStatusEl, 'Bridge disconnected', 'err');
+        log('Bridge closed code=' + e.code + ' reason=' + (e.reason || '(none)'));
+      };
+      ws.onerror = function() {
+        setStatus(bridgeStatusEl, 'Bridge error', 'err');
+        log('Bridge websocket error');
+      };
+      ws.onmessage = function(e) {
+        log('Bridge says: ' + e.data);
+      };
     }
 
-    function safeVec(arr, n, fill = 0) {
-      if (!Array.isArray(arr) || arr.length !== n) {
-        return Array(n).fill(fill);
-      }
-      return arr.map(v => Number.isFinite(v) ? v : fill);
-    }
-
-    function normalizeButtonValue(button) {
-      if (!button) return 0;
-      if (typeof button === 'number') return button;
-      return Number(button.value || 0);
-    }
-
-    function normalizePressed(button) {
-      if (!button) return false;
-      if (typeof button === 'number') return button > 0.5;
-      return !!button.pressed;
-    }
-
-    function makeEmptySide(handedness) {
-      return handedness === 'left'
-        ? {
-            x: false,
-            y: false,
-            menu: false,
-            thumbstick: false,
-            index_trigger: 0,
-            hand_trigger: 0,
-            thumbstick_axes: [0, 0],
-            local_position: [0, 0, 0],
-            local_rotation: [0, 0, 0, 1]
-          }
-        : {
-            a: false,
-            b: false,
-            menu: false,
-            thumbstick: false,
-            index_trigger: 0,
-            hand_trigger: 0,
-            thumbstick_axes: [0, 0],
-            local_position: [0, 0, 0],
-            local_rotation: [0, 0, 0, 1]
-          };
-    }
-
-    function extractControllerState(inputSource, frame, refSpace) {
-      const handedness = inputSource.handedness || 'unknown';
-      const gp = inputSource.gamepad;
-      const side = makeEmptySide(handedness === 'left' ? 'left' : 'right');
-
-      if (gp) {
-        const axes = Array.from(gp.axes || []);
-        const buttons = Array.from(gp.buttons || []).map((b, i) => ({
-          i,
-          pressed: !!b?.pressed,
-          touched: !!b?.touched,
-          value: Number(b?.value || 0)
-        }));
-
-        // Trigger / squeeze are usually first two analog buttons on Quest controllers.
-        side.index_trigger = normalizeButtonValue(gp.buttons?.[0]);
-        side.hand_trigger = normalizeButtonValue(gp.buttons?.[1]);
-
-        // Prefer axes[2]/[3] when present, otherwise fall back to axes[0]/[1].
-        side.thumbstick_axes = safeVec([
-          axes.length >= 4 ? (axes[2] ?? 0) : (axes[0] ?? 0),
-          axes.length >= 4 ? (axes[3] ?? 0) : (axes[1] ?? 0)
-        ], 2, 0);
-
-        if (handedness === 'left') {
-          side.x = normalizePressed(gp.buttons?.[4]) || normalizePressed(gp.buttons?.[2]);
-          side.y = normalizePressed(gp.buttons?.[5]) || normalizePressed(gp.buttons?.[3]);
-          side.menu = normalizePressed(gp.buttons?.[6]);
-          side.thumbstick = normalizePressed(gp.buttons?.[3]);
-        } else {
-          side.a = normalizePressed(gp.buttons?.[4]) || normalizePressed(gp.buttons?.[2]);
-          side.b = normalizePressed(gp.buttons?.[5]) || normalizePressed(gp.buttons?.[3]);
-          side.menu = normalizePressed(gp.buttons?.[6]);
-          side.thumbstick = normalizePressed(gp.buttons?.[3]);
-        }
-
-        side.__raw_gamepad = {
-          id: gp.id || '',
-          axes,
-          buttons
-        };
-      }
-
-      const pose = frame.getPose(inputSource.gripSpace || inputSource.targetRaySpace, refSpace);
-      if (pose) {
-        const p = pose.transform.position;
-        const q = pose.transform.orientation;
-        side.local_position = [p.x, p.y, p.z];
-        side.local_rotation = [q.x, q.y, q.z, q.w];
-      }
-
-      return side;
-    }
-
-    function renderSide(el, side) {
-      el.textContent = JSON.stringify(side, null, 2);
-    }
-
-    function renderRawDebug(lines) {
-      xrRawDebugEl.textContent = lines.join('
-');
-    }
-
-    function sendControllerState(payload) {
-      if (!sendingEnabled) return;
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      const now = performance.now();
-      if (now - lastSentAt < minSendIntervalMs) return;
-      lastSentAt = now;
-      ws.send(JSON.stringify(payload));
-    }
-
-    async function startXR() {
-      if (!('xr' in navigator)) {
-        log('WebXR not supported in this browser');
+    async function enterAR() {
+      log('enterAR() called');
+      if (!navigator.xr) {
+        log('navigator.xr missing');
         setStatus(xrStatusEl, 'XR unsupported', 'err');
         return;
       }
-
       const supported = await navigator.xr.isSessionSupported('immersive-ar');
+      log('immersive-ar supported=' + supported);
       if (!supported) {
-        log('immersive-ar is not supported on this device/browser');
-        setStatus(xrStatusEl, 'XR unsupported', 'err');
+        setStatus(xrStatusEl, 'AR unsupported', 'err');
         return;
       }
-
-      if (!ws || ws.readyState !== WebSocket.OPEN) {
-        log('Bridge is not connected yet; connecting now');
-        connectBridge();
-      }
-
       xrSession = await navigator.xr.requestSession('immersive-ar', {
         optionalFeatures: ['local-floor', 'local', 'bounded-floor', 'hand-tracking', 'plane-detection']
       });
-
-      canvas.style.display = 'block';
-      canvasPlaceholder.style.display = 'none';
-      gl = canvas.getContext('webgl', { xrCompatible: true, antialias: true, alpha: true, premultipliedAlpha: false });
-      await gl.makeXRCompatible();
-      initSimpleRenderer(gl);
-
-      xrSession.updateRenderState({
-        baseLayer: new XRWebGLLayer(xrSession, gl)
-      });
-
-      try {
-        xrRefSpace = await xrSession.requestReferenceSpace(refSpaceEl.value);
-      } catch (e) {
-        log(`Failed to request ${refSpaceEl.value}, fallback to local`);
-        xrRefSpace = await xrSession.requestReferenceSpace('local');
-      }
-
-      xrSession.addEventListener('end', () => {
+      xrRefSpace = await xrSession.requestReferenceSpace('local-floor').catch(() => null);
+      if (!xrRefSpace) xrRefSpace = await xrSession.requestReferenceSpace('local');
+      setStatus(xrStatusEl, 'AR running', 'ok');
+      log('AR session started');
+      xrSession.addEventListener('end', function() {
         xrSession = null;
         xrRefSpace = null;
-        stopVrBtn.disabled = true;
-        startVrBtn.disabled = false;
-        setStatus(xrStatusEl, 'XR idle', 'idle');
-        canvas.style.display = 'none';
-        canvasPlaceholder.style.display = 'block';
-        log('XR session ended');
+        setStatus(xrStatusEl, 'XR idle', '');
+        log('AR session ended');
       });
 
-      stopVrBtn.disabled = false;
-      startVrBtn.disabled = true;
-      setStatus(xrStatusEl, 'XR running', 'ok');
-      log('AR passthrough session started');
+      function onXRFrame(t, frame) {
+        if (!xrSession) return;
+        xrSession.requestAnimationFrame(onXRFrame);
+        const left = makeEmptyLeft();
+        const right = makeEmptyRight();
+        const lines = [];
+        lines.push('inputSources=' + xrSession.inputSources.length);
 
-      const onXRFrame = (time, frame) => {
-        const session = frame.session;
-        session.requestAnimationFrame(onXRFrame);
-
-        const pose = frame.getViewerPose(xrRefSpace);
-        if (!pose) return;
-
-        gl.bindFramebuffer(gl.FRAMEBUFFER, session.renderState.baseLayer.framebuffer);
-        gl.enable(gl.SCISSOR_TEST);
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-        let left = makeEmptySide('left');
-        let right = makeEmptySide('right');
-
-        const rawLines = [];
-        rawLines.push(`inputSources=${session.inputSources.length}`);
-
-        for (const inputSource of session.inputSources) {
-          const handedness = inputSource.handedness || 'unknown';
+        for (const inputSource of xrSession.inputSources) {
+          const hand = inputSource.handedness || 'unknown';
           const profiles = (inputSource.profiles || []).join(',');
           const hasGamepad = !!inputSource.gamepad;
-          rawLines.push(`- hand=${handedness} profiles=[${profiles}] gamepad=${hasGamepad}`);
+          lines.push('- hand=' + hand + ' profiles=[' + profiles + '] gamepad=' + hasGamepad);
 
-          if (inputSource.handedness !== 'left' && inputSource.handedness !== 'right') continue;
-          const side = extractControllerState(inputSource, frame, xrRefSpace);
-          if (side.__raw_gamepad) {
-            rawLines.push(`  ${handedness}.axes=${JSON.stringify(side.__raw_gamepad.axes)}`);
-            rawLines.push(`  ${handedness}.buttons=${JSON.stringify(side.__raw_gamepad.buttons)}`);
-            delete side.__raw_gamepad;
+          let pose = null;
+          try {
+            pose = frame.getPose(inputSource.gripSpace || inputSource.targetRaySpace, xrRefSpace);
+          } catch (e) {}
+
+          const target = hand === 'left' ? left : hand === 'right' ? right : null;
+          if (!target) continue;
+
+          if (pose) {
+            target.local_position = [pose.transform.position.x, pose.transform.position.y, pose.transform.position.z];
+            target.local_rotation = [pose.transform.orientation.x, pose.transform.orientation.y, pose.transform.orientation.z, pose.transform.orientation.w];
           }
-          if (inputSource.handedness === 'left') left = side;
-          if (inputSource.handedness === 'right') right = side;
+
+          if (inputSource.gamepad) {
+            const gp = inputSource.gamepad;
+            const axes = Array.from(gp.axes || []).map(v => num(v, 0));
+            const buttons = Array.from(gp.buttons || []).map((b, i) => ({
+              i: i,
+              pressed: !!b.pressed,
+              value: num(b.value, 0)
+            }));
+            lines.push('  ' + hand + '.axes=' + JSON.stringify(axes));
+            lines.push('  ' + hand + '.buttons=' + JSON.stringify(buttons));
+
+            target.index_trigger = num(gp.buttons[0] && gp.buttons[0].value, 0);
+            target.hand_trigger = num(gp.buttons[1] && gp.buttons[1].value, 0);
+            target.thumbstick_axes = [num(axes[2] ?? axes[0], 0), num(axes[3] ?? axes[1], 0)];
+            target.thumbstick = !!(gp.buttons[3] && gp.buttons[3].pressed);
+
+            if (hand === 'left') {
+              target.x = !!(gp.buttons[4] && gp.buttons[4].pressed);
+              target.y = !!(gp.buttons[5] && gp.buttons[5].pressed);
+              target.menu = !!(gp.buttons[6] && gp.buttons[6].pressed);
+            }
+            if (hand === 'right') {
+              target.a = !!(gp.buttons[4] && gp.buttons[4].pressed);
+              target.b = !!(gp.buttons[5] && gp.buttons[5].pressed);
+              target.menu = !!(gp.buttons[6] && gp.buttons[6].pressed);
+            }
+          }
         }
 
-        renderRawDebug(rawLines);
-        latestLeft = left;
-        latestRight = right;
-        renderSide(leftStateEl, left);
-        renderSide(rightStateEl, right);
-        sendControllerState({ left, right });
-
-        const baseLayer = session.renderState.baseLayer;
-        for (const view of pose.views) {
-          const viewport = baseLayer.getViewport(view);
-          gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
-          gl.scissor(viewport.x, viewport.y, viewport.width, viewport.height);
-
-          gl.clearColor(0.0, 0.0, 0.0, 0.0);
-          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-          drawLines(gl, centerCrossVertices(0.025), [1.0, 1.0, 1.0, 0.95], gl.LINES);
-
-          const leftVerts = controllerMarkerVertices(left.local_position, 0.022);
-          const rightVerts = controllerMarkerVertices(right.local_position, 0.022);
-          if (leftVerts.length) drawLines(gl, leftVerts, [0.25, 0.82, 0.45, 0.95], gl.LINES);
-          if (rightVerts.length) drawLines(gl, rightVerts, [0.38, 0.64, 1.0, 0.95], gl.LINES);
-        }
-
-        gl.disable(gl.BLEND);
-        gl.disable(gl.SCISSOR_TEST);
-      };
+        rawEl.textContent = lines.join('
+');
+        leftEl.textContent = JSON.stringify(left, null, 2);
+        rightEl.textContent = JSON.stringify(right, null, 2);
+        sendState(left, right);
+      }
 
       xrSession.requestAnimationFrame(onXRFrame);
     }
 
-    async function stopXR() {
-      if (xrSession) {
-        await xrSession.end();
-      }
+    async function exitAR() {
+      log('exitAR() called');
+      if (xrSession) await xrSession.end();
     }
 
-    connectBridgeBtn.addEventListener('click', () => {
+    connectBtn.addEventListener('click', function() {
       log('Connect Bridge button clicked');
       connectBridge();
     });
-    startVrBtn.addEventListener('click', () => {
+
+    enterArBtn.addEventListener('click', function() {
       log('Enter AR button clicked');
-      startXR().catch((e) => {
-        setStatus(xrStatusEl, 'XR error', 'err');
-        log(`AR start failed: ${e.message}`);
-        console.error(e);
-      });
-    });
-    stopVrBtn.addEventListener('click', () => {
-      log('Exit AR button clicked');
-      stopXR().catch((e) => {
-        log(`XR stop failed: ${e.message}`);
+      enterAR().catch(function(e) {
+        log('enterAR failed: ' + e.message);
         console.error(e);
       });
     });
 
-    log(`page loaded: protocol=${location.protocol} host=${location.host}`);
-    log(`default bridge url=${bridgeUrlEl.value}`);
-    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-      log('Warning: WebXR AR usually requires HTTPS or localhost.');
-    }
+    exitArBtn.addEventListener('click', function() {
+      log('Exit AR button clicked');
+      exitAR().catch(function(e) {
+        log('exitAR failed: ' + e.message);
+        console.error(e);
+      });
+    });
+
+    log('page loaded: protocol=' + location.protocol + ' host=' + location.host);
+    log('default bridge url=' + bridgeUrlEl.value);
   </script>
 </body>
 </html>
