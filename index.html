@@ -179,7 +179,7 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>YOR WebXR AR Frontend</h1>
+    <h1>YOR WebXR AR Frontend V1</h1>
     <div class="sub">Quest / Oculus controllers → WebXR passthrough AR → WebSocket → YOR bridge → <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">oculus_controller</span></div>
 
     <div class="grid">
@@ -255,6 +255,20 @@
 
   <script>
     const bridgeUrlEl = document.getElementById('bridgeUrl');
+
+    window.addEventListener('error', (event) => {
+      try {
+        log(`[window.error] ${event.message} @ ${event.filename || 'unknown'}:${event.lineno || 0}`);
+      } catch (_) {}
+      console.error(event.error || event.message || event);
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      try {
+        log(`[unhandledrejection] ${event.reason?.message || event.reason || 'unknown rejection'}`);
+      } catch (_) {}
+      console.error(event.reason || event);
+    });
     const refSpaceEl = document.getElementById('refSpace');
     const connectBridgeBtn = document.getElementById('connectBridgeBtn');
     const startVrBtn = document.getElementById('startVrBtn');
@@ -383,33 +397,39 @@
     }
 
     function connectBridge() {
-      const url = bridgeUrlEl.value.trim();
-      if (!url) {
-        log('Bridge URL is empty');
-        return;
-      }
-      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-        log('Bridge already connected or connecting');
-        return;
-      }
-      ws = new WebSocket(url);
-      setStatus(bridgeStatusEl, 'Bridge connecting...', 'idle');
-      ws.onopen = () => {
-        setStatus(bridgeStatusEl, 'Bridge connected', 'ok');
-        log(`Bridge connected: ${url}`);
-      };
-      ws.onclose = () => {
-        setStatus(bridgeStatusEl, 'Bridge disconnected', 'err');
-        log('Bridge disconnected');
-      };
-      ws.onerror = (e) => {
-        setStatus(bridgeStatusEl, 'Bridge error', 'err');
-        log('Bridge websocket error');
+      try {
+        const url = bridgeUrlEl.value.trim();
+        log(`connectBridge() called, url=${url || '(empty)'}`);
+        if (!url) {
+          log('Bridge URL is empty');
+          return;
+        }
+        if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+          log('Bridge already connected or connecting');
+          return;
+        }
+        ws = new WebSocket(url);
+        setStatus(bridgeStatusEl, 'Bridge connecting...', 'idle');
+        ws.onopen = () => {
+          setStatus(bridgeStatusEl, 'Bridge connected', 'ok');
+          log(`Bridge connected: ${url}`);
+        };
+        ws.onclose = (e) => {
+          setStatus(bridgeStatusEl, 'Bridge disconnected', 'err');
+          log(`Bridge disconnected code=${e.code} reason=${e.reason || '(none)'}`);
+        };
+        ws.onerror = (e) => {
+          setStatus(bridgeStatusEl, 'Bridge error', 'err');
+          log('Bridge websocket error');
+          console.error(e);
+        };
+        ws.onmessage = (e) => {
+          log(`Bridge says: ${e.data}`);
+        };
+      } catch (e) {
+        log(`connectBridge() threw: ${e.message}`);
         console.error(e);
-      };
-      ws.onmessage = (e) => {
-        log(`Bridge says: ${e.data}`);
-      };
+      }
     }
 
     function safeVec(arr, n, fill = 0) {
@@ -657,8 +677,12 @@
       }
     }
 
-    connectBridgeBtn.addEventListener('click', connectBridge);
+    connectBridgeBtn.addEventListener('click', () => {
+      log('Connect Bridge button clicked');
+      connectBridge();
+    });
     startVrBtn.addEventListener('click', () => {
+      log('Enter AR button clicked');
       startXR().catch((e) => {
         setStatus(xrStatusEl, 'XR error', 'err');
         log(`AR start failed: ${e.message}`);
@@ -666,12 +690,15 @@
       });
     });
     stopVrBtn.addEventListener('click', () => {
+      log('Exit AR button clicked');
       stopXR().catch((e) => {
         log(`XR stop failed: ${e.message}`);
         console.error(e);
       });
     });
 
+    log(`page loaded: protocol=${location.protocol} host=${location.host}`);
+    log(`default bridge url=${bridgeUrlEl.value}`);
     if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
       log('Warning: WebXR AR usually requires HTTPS or localhost.');
     }
