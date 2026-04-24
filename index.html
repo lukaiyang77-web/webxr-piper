@@ -213,6 +213,10 @@
 
         <div class="mini">
           <div>
+            <label>XR raw debug</label>
+            <div id="xrRawDebug" class="mono">No XR raw data yet.</div>
+          </div>
+          <div>
             <label>Left controller</label>
             <div id="leftState" class="mono">No data yet.</div>
           </div>
@@ -259,6 +263,7 @@
     const xrStatusEl = document.getElementById('xrStatus');
     const leftStateEl = document.getElementById('leftState');
     const rightStateEl = document.getElementById('rightState');
+    const xrRawDebugEl = document.getElementById('xrRawDebug');
     const logEl = document.getElementById('log');
     const canvas = document.getElementById('glCanvas');
 
@@ -459,22 +464,40 @@
 
       if (gp) {
         const axes = Array.from(gp.axes || []);
-        // Common Oculus mapping: 0/1 thumbstick axes, 0 trigger, 1 squeeze, 4/5 ABXY, 3 thumbstick press.
+        const buttons = Array.from(gp.buttons || []).map((b, i) => ({
+          i,
+          pressed: !!b?.pressed,
+          touched: !!b?.touched,
+          value: Number(b?.value || 0)
+        }));
+
+        // Trigger / squeeze are usually first two analog buttons on Quest controllers.
         side.index_trigger = normalizeButtonValue(gp.buttons?.[0]);
         side.hand_trigger = normalizeButtonValue(gp.buttons?.[1]);
-        side.thumbstick_axes = safeVec([axes[2] ?? axes[0] ?? 0, axes[3] ?? axes[1] ?? 0], 2, 0);
+
+        // Prefer axes[2]/[3] when present, otherwise fall back to axes[0]/[1].
+        side.thumbstick_axes = safeVec([
+          axes.length >= 4 ? (axes[2] ?? 0) : (axes[0] ?? 0),
+          axes.length >= 4 ? (axes[3] ?? 0) : (axes[1] ?? 0)
+        ], 2, 0);
 
         if (handedness === 'left') {
-          side.x = normalizePressed(gp.buttons?.[4]);
-          side.y = normalizePressed(gp.buttons?.[5]);
+          side.x = normalizePressed(gp.buttons?.[4]) || normalizePressed(gp.buttons?.[2]);
+          side.y = normalizePressed(gp.buttons?.[5]) || normalizePressed(gp.buttons?.[3]);
           side.menu = normalizePressed(gp.buttons?.[6]);
           side.thumbstick = normalizePressed(gp.buttons?.[3]);
         } else {
-          side.a = normalizePressed(gp.buttons?.[4]);
-          side.b = normalizePressed(gp.buttons?.[5]);
+          side.a = normalizePressed(gp.buttons?.[4]) || normalizePressed(gp.buttons?.[2]);
+          side.b = normalizePressed(gp.buttons?.[5]) || normalizePressed(gp.buttons?.[3]);
           side.menu = normalizePressed(gp.buttons?.[6]);
           side.thumbstick = normalizePressed(gp.buttons?.[3]);
         }
+
+        side.__raw_gamepad = {
+          id: gp.id || '',
+          axes,
+          buttons
+        };
       }
 
       const pose = frame.getPose(inputSource.gripSpace || inputSource.targetRaySpace, refSpace);
@@ -490,6 +513,11 @@
 
     function renderSide(el, side) {
       el.textContent = JSON.stringify(side, null, 2);
+    }
+
+    function renderRawDebug(lines) {
+      xrRawDebugEl.textContent = lines.join('
+');
     }
 
     function sendControllerState(payload) {
@@ -572,13 +600,27 @@
         let left = makeEmptySide('left');
         let right = makeEmptySide('right');
 
+        const rawLines = [];
+        rawLines.push(`inputSources=${session.inputSources.length}`);
+
         for (const inputSource of session.inputSources) {
+          const handedness = inputSource.handedness || 'unknown';
+          const profiles = (inputSource.profiles || []).join(',');
+          const hasGamepad = !!inputSource.gamepad;
+          rawLines.push(`- hand=${handedness} profiles=[${profiles}] gamepad=${hasGamepad}`);
+
           if (inputSource.handedness !== 'left' && inputSource.handedness !== 'right') continue;
           const side = extractControllerState(inputSource, frame, xrRefSpace);
+          if (side.__raw_gamepad) {
+            rawLines.push(`  ${handedness}.axes=${JSON.stringify(side.__raw_gamepad.axes)}`);
+            rawLines.push(`  ${handedness}.buttons=${JSON.stringify(side.__raw_gamepad.buttons)}`);
+            delete side.__raw_gamepad;
+          }
           if (inputSource.handedness === 'left') left = side;
           if (inputSource.handedness === 'right') right = side;
         }
 
+        renderRawDebug(rawLines);
         latestLeft = left;
         latestRight = right;
         renderSide(leftStateEl, left);
