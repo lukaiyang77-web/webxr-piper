@@ -3,950 +3,520 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WebXR Piper Controller V5.2</title>
+  <title>YOR WebXR Oculus Bridge Frontend</title>
   <style>
     :root {
-      color-scheme: dark;
       --bg: #0b1020;
-      --panel: #121933;
-      --panel-2: #1a2447;
-      --text: #e7ecff;
-      --muted: #9fb0e3;
-      --ok: #51d88a;
-      --warn: #ffcc66;
-      --bad: #ff6b6b;
-      --accent: #78a6ff;
-      --border: rgba(255,255,255,0.08);
+      --panel: #141b34;
+      --panel2: #1b2446;
+      --text: #eaf0ff;
+      --muted: #9fb0dd;
+      --ok: #35c759;
+      --warn: #ffcc00;
+      --err: #ff5f57;
+      --accent: #66a3ff;
+      --border: rgba(255,255,255,0.12);
     }
-
     * { box-sizing: border-box; }
-
     body {
       margin: 0;
-      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: linear-gradient(180deg, #0a0f1e 0%, #0f1730 100%);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #0b1020 0%, #0e1530 100%);
       color: var(--text);
       min-height: 100vh;
-      padding: 20px;
     }
-
     .wrap {
       max-width: 1100px;
       margin: 0 auto;
-      display: grid;
-      gap: 16px;
+      padding: 24px;
     }
-
+    h1 {
+      margin: 0 0 10px 0;
+      font-size: 28px;
+      line-height: 1.2;
+    }
+    .sub {
+      color: var(--muted);
+      margin-bottom: 22px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+    }
     .card {
-      background: rgba(18, 25, 51, 0.94);
+      background: rgba(20, 27, 52, 0.92);
       border: 1px solid var(--border);
       border-radius: 18px;
       padding: 18px;
-      box-shadow: 0 12px 32px rgba(0,0,0,0.28);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
     }
-
-    h1, h2 {
-      margin: 0 0 10px 0;
-      font-weight: 700;
-    }
-
-    h1 { font-size: 28px; }
-    h2 { font-size: 18px; }
-
-    p {
-      margin: 0;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-
     .row {
       display: flex;
+      gap: 10px;
       flex-wrap: wrap;
-      gap: 12px;
       align-items: center;
     }
-
-    button, input {
+    .row + .row { margin-top: 12px; }
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
       border-radius: 12px;
       border: 1px solid var(--border);
-      background: var(--panel-2);
+      background: var(--panel2);
       color: var(--text);
-      padding: 12px 14px;
-      font-size: 14px;
+      outline: none;
     }
-
+    input:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(102,163,255,0.18);
+    }
+    .field {
+      flex: 1 1 230px;
+    }
     button {
-      cursor: pointer;
+      appearance: none;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, #2a59d4 0%, #2349af 100%);
+      color: #fff;
+      padding: 12px 16px;
+      border-radius: 14px;
       font-weight: 600;
+      cursor: pointer;
     }
-
-    button:hover {
-      filter: brightness(1.08);
+    button.secondary {
+      background: #202949;
     }
-
     button:disabled {
-      opacity: 0.5;
+      opacity: 0.55;
       cursor: not-allowed;
     }
-
-    input {
-      min-width: 320px;
-    }
-
-    .pill {
+    .status {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: var(--panel-2);
-      border: 1px solid var(--border);
+      padding: 8px 12px;
       border-radius: 999px;
-      padding: 10px 12px;
-      font-size: 13px;
-      color: var(--muted);
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      font-size: 14px;
     }
-
     .dot {
       width: 10px;
       height: 10px;
-      border-radius: 50%;
+      border-radius: 999px;
       background: var(--warn);
-      box-shadow: 0 0 12px rgba(255, 204, 102, 0.45);
+      box-shadow: 0 0 10px rgba(255,204,0,0.5);
     }
-
-    .dot.ok { background: var(--ok); box-shadow: 0 0 12px rgba(81, 216, 138, 0.45); }
-    .dot.bad { background: var(--bad); box-shadow: 0 0 12px rgba(255, 107, 107, 0.45); }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 16px;
-    }
-
-    pre {
-      margin: 0;
+    .dot.ok { background: var(--ok); box-shadow: 0 0 10px rgba(53,199,89,0.5); }
+    .dot.err { background: var(--err); box-shadow: 0 0 10px rgba(255,95,87,0.5); }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       white-space: pre-wrap;
       word-break: break-word;
-      background: rgba(255,255,255,0.04);
+      font-size: 12px;
+      line-height: 1.45;
+      background: rgba(0,0,0,0.18);
       border: 1px solid var(--border);
       border-radius: 14px;
-      padding: 14px;
-      font-size: 13px;
-      line-height: 1.5;
-      color: #dce6ff;
-      min-height: 220px;
+      padding: 12px;
+      min-height: 160px;
+      max-height: 320px;
       overflow: auto;
     }
-
-    .hint {
-      font-size: 13px;
+    .mini {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .pill {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid var(--border);
       color: var(--muted);
+      background: rgba(255,255,255,0.05);
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+    .tips {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .canvas-holder {
+      margin-top: 14px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #000;
+      aspect-ratio: 16 / 9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="card">
-      <h1>WebXR Piper Controller V5.4</h1>
-      <p>
-        Open this page in the Quest browser, connect to your Python backend with WebSocket,
-        enter VR, then use the <strong>right controller pose</strong> as the teleop source.
-        Buttons are sent too, so you can map them to gripper and reset on the backend.
-      </p>
-    </div>
-
-    <div class="card">
-      <div class="row" style="margin-bottom: 12px;">
-        <input id="wsUrl" value="ws://172.22.205.37:8765" />
-        <button id="connectBtn">Connect WebSocket</button>
-        <button id="enterVrBtn">Enter VR</button>
-        <button id="setRefBtn">Set Reference</button>
-      </div>
-      <div class="row">
-        <div class="pill"><span id="wsDot" class="dot"></span> <span id="wsStatus">WebSocket: disconnected</span></div>
-        <div class="pill"><span id="xrDot" class="dot"></span> <span id="xrStatus">XR: idle</span></div>
-        <div class="pill"><span id="refDot" class="dot"></span> <span id="refStatus">Reference: not set</span></div>
-      </div>
-      <div class="row" style="margin-top: 12px;">
-        <span class="hint">
-          Suggested mapping on the backend: right controller pose → relative transform; A/B or trigger buttons → gripper/reset.
-        </span>
-      </div>
-    </div>
+    <h1>YOR WebXR Frontend</h1>
+    <div class="sub">Quest / Oculus controllers → WebXR → WebSocket → YOR bridge → <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">oculus_controller</span></div>
 
     <div class="grid">
       <div class="card">
-        <h2>Current packet</h2>
-        <pre id="packetView">Waiting for XR frame...</pre>
-      </div>
-      <div class="card">
-        <h2>Instructions</h2>
-        <pre>
-1. Start your Python WebSocket server on the Linux machine.
-2. Replace the WebSocket URL above if needed.
-3. Open this page in the Quest browser.
-4. Tap “Connect WebSocket”.
-5. Tap “Enter VR”.
-6. Tap “Set Reference” while holding the controller in your neutral pose.
-7. Move the right controller. The page will stream controller pose and button state.
+        <div class="row">
+          <div class="field">
+            <label for="bridgeUrl">Bridge WebSocket URL</label>
+            <input id="bridgeUrl" value="ws://127.0.0.1:8766" />
+          </div>
+          <div class="field" style="max-width: 220px;">
+            <label for="refSpace">Reference Space</label>
+            <select id="refSpace">
+              <option value="local-floor" selected>local-floor</option>
+              <option value="local">local</option>
+            </select>
+          </div>
+        </div>
 
-Recommended backend logic:
-- Save reference when receive set_reference = true
-- Compute T_rel = inv(T_ref) @ T_now
-- Remap controller axes to robot axes
-- Use buttons for gripper/open close and reset
-        </pre>
+        <div class="row">
+          <button id="connectBridgeBtn" class="secondary">Connect Bridge</button>
+          <button id="startVrBtn">Enter VR</button>
+          <button id="stopVrBtn" class="secondary" disabled>Exit VR</button>
+          <div id="bridgeStatus" class="status"><span class="dot"></span><span>Bridge disconnected</span></div>
+          <div id="xrStatus" class="status"><span class="dot"></span><span>XR idle</span></div>
+        </div>
+
+        <div class="canvas-holder" id="canvasHolder">
+          <span id="canvasPlaceholder">WebXR session not started</span>
+          <canvas id="glCanvas" style="display:none"></canvas>
+        </div>
+
+        <div class="mini">
+          <div>
+            <label>Left controller</label>
+            <div id="leftState" class="mono">No data yet.</div>
+          </div>
+          <div>
+            <label>Right controller</label>
+            <div id="rightState" class="mono">No data yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <span class="pill">A = right btn0</span>
+          <span class="pill">B = right btn1</span>
+          <span class="pill">X = left btn0</span>
+          <span class="pill">Y = left btn1</span>
+        </div>
+        <div class="row">
+          <span class="pill">Trigger = index_trigger</span>
+          <span class="pill">Squeeze = hand_trigger</span>
+          <span class="pill">Stick press = thumbstick</span>
+        </div>
+        <div class="row tips">
+          Use HTTPS or localhost. WebXR usually will not start from plain HTTP.<br />
+          The bridge URL should point to the machine running <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">yor_oculus_bridge.py</span>.<br />
+          This page sends controller poses as <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">local_position</span> and <span class="mono" style="display:inline;padding:2px 6px;min-height:auto;max-height:none;">local_rotation[x,y,z,w]</span> every XR frame.
+        </div>
+        <div style="margin-top:14px;">
+          <label>Logs</label>
+          <div id="log" class="mono"></div>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
+    const bridgeUrlEl = document.getElementById('bridgeUrl');
+    const refSpaceEl = document.getElementById('refSpace');
+    const connectBridgeBtn = document.getElementById('connectBridgeBtn');
+    const startVrBtn = document.getElementById('startVrBtn');
+    const stopVrBtn = document.getElementById('stopVrBtn');
+    const bridgeStatusEl = document.getElementById('bridgeStatus');
+    const xrStatusEl = document.getElementById('xrStatus');
+    const leftStateEl = document.getElementById('leftState');
+    const rightStateEl = document.getElementById('rightState');
+    const logEl = document.getElementById('log');
+    const canvas = document.getElementById('glCanvas');
+    const canvasPlaceholder = document.getElementById('canvasPlaceholder');
+
     let ws = null;
     let xrSession = null;
     let xrRefSpace = null;
     let gl = null;
-    let frameCounter = 0;
-    let lastSentTime = 0;
-    const SEND_INTERVAL_MS = 25; // ~20 Hz
-    const XR_MODE = 'immersive-ar';
-  
-    let controlActive = false;
-    let lastRightGripPressed = false;
-    let lastRightTriggerPressed = false;
-    let lastRightControllerState = null;
-    let refMatrix = null;
-    let refPosition = null;
-    let pendingSetReference = false;
-    let gripperClosed = false;
+    let sendingEnabled = true;
+    let lastSentAt = 0;
+    const minSendIntervalMs = 16; // about 60Hz
 
-    let lastAButtonPressed = false;
-    
-  
-    const wsUrlInput = document.getElementById('wsUrl');
-    const connectBtn = document.getElementById('connectBtn');
-    const enterVrBtn = document.getElementById('enterVrBtn');
-    const setRefBtn = document.getElementById('setRefBtn');
-  
-    const wsDot = document.getElementById('wsDot');
-    const wsStatus = document.getElementById('wsStatus');
-    const xrDot = document.getElementById('xrDot');
-    const xrStatus = document.getElementById('xrStatus');
-    const refDot = document.getElementById('refDot');
-    const refStatus = document.getElementById('refStatus');
-    const packetView = document.getElementById('packetView');
-  
-    let xrProgram = null;
-    let xrPointBuffer = null;
-    let attribPosition = null;
-    let uModel = null;
-    let uView = null;
-    let uProjection = null;
-    let uColor = null;
-  
-    function setPill(dotEl, textEl, status, text) {
-      dotEl.classList.remove('ok', 'bad');
-      if (status === 'ok') dotEl.classList.add('ok');
-      if (status === 'bad') dotEl.classList.add('bad');
-      textEl.textContent = text;
+    function log(msg) {
+      const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logEl.textContent += line + '\n';
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log(msg);
     }
-  
-    function sendDebug(tag, message, extra = {}) {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      ws.send(JSON.stringify({
-        type: 'frontend_debug',
-        timestamp_ms: performance.now(),
-        tag,
-        message,
-        extra,
-      }));
+
+    function setStatus(el, text, state = 'idle') {
+      const dot = el.querySelector('.dot');
+      const span = el.querySelector('span:last-child');
+      span.textContent = text;
+      dot.classList.remove('ok', 'err');
+      if (state === 'ok') dot.classList.add('ok');
+      if (state === 'err') dot.classList.add('err');
     }
-  
-    function matrixFromTransform(transform) {
-      const m = new Float32Array(16);
-      const q = transform.orientation;
-      const p = transform.position;
-  
-      const x = q.x, y = q.y, z = q.z, w = q.w;
-      const x2 = x + x, y2 = y + y, z2 = z + z;
-      const xx = x * x2, xy = x * y2, xz = x * z2;
-      const yy = y * y2, yz = y * z2, zz = z * z2;
-      const wx = w * x2, wy = w * y2, wz = w * z2;
-  
-      m[0] = 1 - (yy + zz);
-      m[1] = xy + wz;
-      m[2] = xz - wy;
-      m[3] = 0;
-  
-      m[4] = xy - wz;
-      m[5] = 1 - (xx + zz);
-      m[6] = yz + wx;
-      m[7] = 0;
-  
-      m[8] = xz + wy;
-      m[9] = yz - wx;
-      m[10] = 1 - (xx + yy);
-      m[11] = 0;
-  
-      m[12] = p.x;
-      m[13] = p.y;
-      m[14] = p.z;
-      m[15] = 1;
-      return Array.from(m);
-    }
-  
-    function gamepadButtonsToObject(gamepad) {
-      if (!gamepad || !gamepad.buttons) return {};
-      const out = {};
-      gamepad.buttons.forEach((btn, i) => {
-        out[`b${i}`] = {
-          pressed: !!btn.pressed,
-          touched: !!btn.touched,
-          value: Number(btn.value || 0),
-        };
-      });
-      return out;
-    }
-  
-    function gamepadAxesToArray(gamepad) {
-      if (!gamepad || !gamepad.axes) return [];
-      return Array.from(gamepad.axes, x => Number(x));
-    }
-  
-    function sendPacket(packet) {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      ws.send(JSON.stringify(packet));
-    }
-  
-    function connectWebSocket() {
+
+    function connectBridge() {
+      const url = bridgeUrlEl.value.trim();
+      if (!url) {
+        log('Bridge URL is empty');
+        return;
+      }
       if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        log('Bridge already connected or connecting');
         return;
       }
-  
-      ws = new WebSocket(wsUrlInput.value.trim());
-      setPill(wsDot, wsStatus, '', 'WebSocket: connecting...');
-  
+      ws = new WebSocket(url);
+      setStatus(bridgeStatusEl, 'Bridge connecting...', 'idle');
       ws.onopen = () => {
-        setPill(wsDot, wsStatus, 'ok', 'WebSocket: connected');
-        sendDebug('ws_open', 'WebSocket connected on frontend');
+        setStatus(bridgeStatusEl, 'Bridge connected', 'ok');
+        log(`Bridge connected: ${url}`);
       };
-  
-      ws.onclose = (event) => {
-        console.error('WebSocket close:', event);
-        setPill(wsDot, wsStatus, 'bad', `WebSocket: closed code=${event.code}`);
-        packetView.textContent = `WebSocket closed. code=${event.code} reason=${event.reason || '(empty)'}`;
+      ws.onclose = () => {
+        setStatus(bridgeStatusEl, 'Bridge disconnected', 'err');
+        log('Bridge disconnected');
       };
-  
-      ws.onerror = (event) => {
-        console.error('WebSocket error:', event);
-        setPill(wsDot, wsStatus, 'bad', 'WebSocket: error');
-        packetView.textContent = 'WebSocket error. Check URL / browser security policy.';
+      ws.onerror = (e) => {
+        setStatus(bridgeStatusEl, 'Bridge error', 'err');
+        log('Bridge websocket error');
+        console.error(e);
       };
-  
-      ws.onmessage = (event) => {
-        console.log('Server:', event.data);
+      ws.onmessage = (e) => {
+        log(`Bridge says: ${e.data}`);
       };
-    }
-  
-    function createShader(gl, type, source) {
-      const shader = gl.createShader(type);
-      gl.shaderSource(shader, source);
-      gl.compileShader(shader);
-  
-      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error(gl.getShaderInfoLog(shader));
-        gl.deleteShader(shader);
-        return null;
-      }
-      return shader;
-    }
-  
-    function createProgram(gl, vsSource, fsSource) {
-      const vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
-      const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
-      if (!vs || !fs) return null;
-  
-      const program = gl.createProgram();
-      gl.attachShader(program, vs);
-      gl.attachShader(program, fs);
-      gl.linkProgram(program);
-  
-      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-        console.error(gl.getProgramInfoLog(program));
-        gl.deleteProgram(program);
-        return null;
-      }
-      return program;
-    }
-  
-    function initXRRendering() {
-      const vsSource = `
-        attribute vec3 aPosition;
-        uniform mat4 uModel;
-        uniform mat4 uView;
-        uniform mat4 uProjection;
-  
-        void main() {
-          gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
-          gl_PointSize = 22.0;
-        }
-      `;
-  
-      const fsSource = `
-        precision mediump float;
-        uniform vec4 uColor;
-  
-        void main() {
-          vec2 c = gl_PointCoord - vec2(0.5);
-          if (dot(c, c) > 0.25) discard;
-          gl_FragColor = uColor;
-        }
-      `;
-  
-      xrProgram = createProgram(gl, vsSource, fsSource);
-      if (!xrProgram) {
-        throw new Error('Failed to create XR shader program');
-      }
-  
-      attribPosition = gl.getAttribLocation(xrProgram, 'aPosition');
-      uModel = gl.getUniformLocation(xrProgram, 'uModel');
-      uView = gl.getUniformLocation(xrProgram, 'uView');
-      uProjection = gl.getUniformLocation(xrProgram, 'uProjection');
-      uColor = gl.getUniformLocation(xrProgram, 'uColor');
-  
-      xrPointBuffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, xrPointBuffer);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 0]), gl.STATIC_DRAW);
-    }
-  
-    function makeTranslationMatrix(x, y, z) {
-      return new Float32Array([
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        x, y, z, 1,
-      ]);
     }
 
-    function multiplyMat4(a, b) {
-      const out = new Float32Array(16);
-      for (let col = 0; col < 4; col++) {
-        for (let row = 0; row < 4; row++) {
-          out[col * 4 + row] =
-            a[0 * 4 + row] * b[col * 4 + 0] +
-            a[1 * 4 + row] * b[col * 4 + 1] +
-            a[2 * 4 + row] * b[col * 4 + 2] +
-            a[3 * 4 + row] * b[col * 4 + 3];
+    function safeVec(arr, n, fill = 0) {
+      if (!Array.isArray(arr) || arr.length !== n) {
+        return Array(n).fill(fill);
+      }
+      return arr.map(v => Number.isFinite(v) ? v : fill);
+    }
+
+    function normalizeButtonValue(button) {
+      if (!button) return 0;
+      if (typeof button === 'number') return button;
+      return Number(button.value || 0);
+    }
+
+    function normalizePressed(button) {
+      if (!button) return false;
+      if (typeof button === 'number') return button > 0.5;
+      return !!button.pressed;
+    }
+
+    function makeEmptySide(handedness) {
+      return handedness === 'left'
+        ? {
+            x: false,
+            y: false,
+            menu: false,
+            thumbstick: false,
+            index_trigger: 0,
+            hand_trigger: 0,
+            thumbstick_axes: [0, 0],
+            local_position: [0, 0, 0],
+            local_rotation: [0, 0, 0, 1]
+          }
+        : {
+            a: false,
+            b: false,
+            menu: false,
+            thumbstick: false,
+            index_trigger: 0,
+            hand_trigger: 0,
+            thumbstick_axes: [0, 0],
+            local_position: [0, 0, 0],
+            local_rotation: [0, 0, 0, 1]
+          };
+    }
+
+    function extractControllerState(inputSource, frame, refSpace) {
+      const handedness = inputSource.handedness || 'unknown';
+      const gp = inputSource.gamepad;
+      const side = makeEmptySide(handedness === 'left' ? 'left' : 'right');
+
+      if (gp) {
+        const axes = Array.from(gp.axes || []);
+        // Common Oculus mapping: 0/1 thumbstick axes, 0 trigger, 1 squeeze, 4/5 ABXY, 3 thumbstick press.
+        side.index_trigger = normalizeButtonValue(gp.buttons?.[0]);
+        side.hand_trigger = normalizeButtonValue(gp.buttons?.[1]);
+        side.thumbstick_axes = safeVec([axes[2] ?? axes[0] ?? 0, axes[3] ?? axes[1] ?? 0], 2, 0);
+
+        if (handedness === 'left') {
+          side.x = normalizePressed(gp.buttons?.[4]);
+          side.y = normalizePressed(gp.buttons?.[5]);
+          side.menu = normalizePressed(gp.buttons?.[6]);
+          side.thumbstick = normalizePressed(gp.buttons?.[3]);
+        } else {
+          side.a = normalizePressed(gp.buttons?.[4]);
+          side.b = normalizePressed(gp.buttons?.[5]);
+          side.menu = normalizePressed(gp.buttons?.[6]);
+          side.thumbstick = normalizePressed(gp.buttons?.[3]);
         }
       }
-      return out;
-    }
 
-    function invertMat4(m) {
-      const inv = new Float32Array(16);
-
-      inv[0] = m[5]  * m[10] * m[15] - 
-              m[5]  * m[11] * m[14] - 
-              m[9]  * m[6]  * m[15] + 
-              m[9]  * m[7]  * m[14] +
-              m[13] * m[6]  * m[11] - 
-              m[13] * m[7]  * m[10];
-
-      inv[4] = -m[4]  * m[10] * m[15] + 
-                m[4]  * m[11] * m[14] + 
-                m[8]  * m[6]  * m[15] - 
-                m[8]  * m[7]  * m[14] - 
-                m[12] * m[6]  * m[11] + 
-                m[12] * m[7]  * m[10];
-
-      inv[8] = m[4]  * m[9] * m[15] - 
-              m[4]  * m[11] * m[13] - 
-              m[8]  * m[5] * m[15] + 
-              m[8]  * m[7] * m[13] + 
-              m[12] * m[5] * m[11] - 
-              m[12] * m[7] * m[9];
-
-      inv[12] = -m[4]  * m[9] * m[14] + 
-                m[4]  * m[10] * m[13] +
-                m[8]  * m[5] * m[14] - 
-                m[8]  * m[6] * m[13] - 
-                m[12] * m[5] * m[10] + 
-                m[12] * m[6] * m[9];
-
-      inv[1] = -m[1]  * m[10] * m[15] + 
-                m[1]  * m[11] * m[14] + 
-                m[9]  * m[2] * m[15] - 
-                m[9]  * m[3] * m[14] - 
-                m[13] * m[2] * m[11] + 
-                m[13] * m[3] * m[10];
-
-      inv[5] = m[0]  * m[10] * m[15] - 
-              m[0]  * m[11] * m[14] - 
-              m[8]  * m[2] * m[15] + 
-              m[8]  * m[3] * m[14] + 
-              m[12] * m[2] * m[11] - 
-              m[12] * m[3] * m[10];
-
-      inv[9] = -m[0]  * m[9] * m[15] + 
-                m[0]  * m[11] * m[13] + 
-                m[8]  * m[1] * m[15] - 
-                m[8]  * m[3] * m[13] - 
-                m[12] * m[1] * m[11] + 
-                m[12] * m[3] * m[9];
-
-      inv[13] = m[0]  * m[9] * m[14] - 
-                m[0]  * m[10] * m[13] - 
-                m[8]  * m[1] * m[14] + 
-                m[8]  * m[2] * m[13] + 
-                m[12] * m[1] * m[10] - 
-                m[12] * m[2] * m[9];
-
-      inv[2] = m[1]  * m[6] * m[15] - 
-              m[1]  * m[7] * m[14] - 
-              m[5]  * m[2] * m[15] + 
-              m[5]  * m[3] * m[14] + 
-              m[13] * m[2] * m[7] - 
-              m[13] * m[3] * m[6];
-
-      inv[6] = -m[0]  * m[6] * m[15] + 
-                m[0]  * m[7] * m[14] + 
-                m[4]  * m[2] * m[15] - 
-                m[4]  * m[3] * m[14] - 
-                m[12] * m[2] * m[7] + 
-                m[12] * m[3] * m[6];
-
-      inv[10] = m[0]  * m[5] * m[15] - 
-                m[0]  * m[7] * m[13] - 
-                m[4]  * m[1] * m[15] + 
-                m[4]  * m[3] * m[13] + 
-                m[12] * m[1] * m[7] - 
-                m[12] * m[3] * m[5];
-
-      inv[14] = -m[0]  * m[5] * m[14] + 
-                m[0]  * m[6] * m[13] + 
-                m[4]  * m[1] * m[14] - 
-                m[4]  * m[2] * m[13] - 
-                m[12] * m[1] * m[6] + 
-                m[12] * m[2] * m[5];
-
-      inv[3] = -m[1] * m[6] * m[11] + 
-                m[1] * m[7] * m[10] + 
-                m[5] * m[2] * m[11] - 
-                m[5] * m[3] * m[10] - 
-                m[9] * m[2] * m[7] + 
-                m[9] * m[3] * m[6];
-
-      inv[7] = m[0] * m[6] * m[11] - 
-              m[0] * m[7] * m[10] - 
-              m[4] * m[2] * m[11] + 
-              m[4] * m[3] * m[10] + 
-              m[8] * m[2] * m[7] - 
-              m[8] * m[3] * m[6];
-
-      inv[11] = -m[0] * m[5] * m[11] + 
-                m[0] * m[7] * m[9] + 
-                m[4] * m[1] * m[11] - 
-                m[4] * m[3] * m[9] - 
-                m[8] * m[1] * m[7] + 
-                m[8] * m[3] * m[5];
-
-      inv[15] = m[0] * m[5] * m[10] - 
-                m[0] * m[6] * m[9] - 
-                m[4] * m[1] * m[10] + 
-                m[4] * m[2] * m[9] + 
-                m[8] * m[1] * m[6] - 
-                m[8] * m[2] * m[5];
-
-      let det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
-      if (Math.abs(det) < 1e-8) return null;
-
-      det = 1.0 / det;
-      for (let i = 0; i < 16; i++) inv[i] *= det;
-      return inv;
-    }
-
-    function drawHudPoint(view, localX, localY, localZ, color) {
-      // local position is relative to the viewer/head
-      const hudLocal = makeTranslationMatrix(localX, localY, localZ);
-      const hudWorld = multiplyMat4(view.transform.matrix, hudLocal);
-
-      gl.uniformMatrix4fv(uView, false, view.transform.inverse.matrix);
-      gl.uniformMatrix4fv(uProjection, false, view.projectionMatrix);
-      gl.uniformMatrix4fv(uModel, false, hudWorld);
-      gl.uniform4f(uColor, color[0], color[1], color[2], color[3]);
-      gl.drawArrays(gl.POINTS, 0, 1);
-    }
-
-    function getButtonPressed(state, index) {
-      return !!state?.gamepad?.buttons?.[`b${index}`]?.pressed;
-    }
-    
-    function getButtonValue(state, index) {
-      const v = state?.gamepad?.buttons?.[`b${index}`]?.value;
-      return Number(v || 0);
-    }
-    
-    function convertControllerState(state) {
-      if (!state || !state.pose) {
-        return {
-          position: null,
-          quaternion: null,
-          gripActive: false,
-          trigger: 0.0,
-          buttons: {},
-          axes: [],
-          tracked: false,
-          poseSpace: 'none',
-          profiles: [],
-        };
+      const pose = frame.getPose(inputSource.gripSpace || inputSource.targetRaySpace, refSpace);
+      if (pose) {
+        const p = pose.transform.position;
+        const q = pose.transform.orientation;
+        side.local_position = [p.x, p.y, p.z];
+        side.local_rotation = [q.x, q.y, q.z, q.w];
       }
-    
-      const gripActive = getButtonPressed(state, 1);
-      const triggerValue = getButtonValue(state, 0);
-    
-      return {
-        position: {
-          x: Number(state.pose.position.x),
-          y: Number(state.pose.position.y),
-          z: Number(state.pose.position.z),
-        },
-        quaternion: {
-          x: Number(state.pose.orientation.x),
-          y: Number(state.pose.orientation.y),
-          z: Number(state.pose.orientation.z),
-          w: Number(state.pose.orientation.w),
-        },
-        gripActive,
-        trigger: triggerValue,
-        buttons: state.gamepad?.buttons || {},
-        axes: state.gamepad?.axes || [],
-        tracked: true,
-        poseSpace: state.pose.space || 'none',
-        profiles: state.profiles || [],
-      };
+
+      return side;
     }
 
-    function buildSDKStyleControllerPacket(controllerSnapshot) {
-      const rightGripPressed = getButtonPressed(controllerSnapshot.right, 1);
-      const rightTriggerPressed = getButtonValue(controllerSnapshot.right, 0) > 0.5;
-      const aPressed = getButtonPressed(controllerSnapshot.right, 4);
-    
-      const gripPressedEdge = rightGripPressed && !lastRightGripPressed;
-      const triggerPressedEdge = rightTriggerPressed && !lastRightTriggerPressed;
-    
-      const gripReleased = (!rightGripPressed && lastRightGripPressed);
-      const triggerReleased = (!rightTriggerPressed && lastRightTriggerPressed);
-      const resetEvent = (aPressed && !lastAButtonPressed);
-    
-      const packet = {
-        type: 'vr_controller_state',
-        timestamp_ms: performance.now(),
-        frame_counter: frameCounter,
-    
-        leftController: convertControllerState(controllerSnapshot.left),
-        rightController: convertControllerState(controllerSnapshot.right),
-    
-        hand: 'right',
-        gripPressedEdge,
-        gripReleased,
-        triggerPressedEdge,
-        triggerReleased,
-        resetEvent,
-      };
-    
-      lastRightGripPressed = rightGripPressed;
-      lastRightTriggerPressed = rightTriggerPressed;
-      lastAButtonPressed = aPressed;
-    
-      return packet;
+    function renderSide(el, side) {
+      el.textContent = JSON.stringify(side, null, 2);
     }
-    
+
+    function sendControllerState(payload) {
+      if (!sendingEnabled) return;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      const now = performance.now();
+      if (now - lastSentAt < minSendIntervalMs) return;
+      lastSentAt = now;
+      ws.send(JSON.stringify(payload));
+    }
+
     async function startXR() {
-      if (!navigator.xr) {
-        alert('WebXR is not available in this browser. Open this page in the Quest browser.');
+      if (!('xr' in navigator)) {
+        log('WebXR not supported in this browser');
+        setStatus(xrStatusEl, 'XR unsupported', 'err');
         return;
       }
-  
-      const supported = await navigator.xr.isSessionSupported(XR_MODE);
+
+      const supported = await navigator.xr.isSessionSupported('immersive-vr');
       if (!supported) {
-        alert(`${XR_MODE} is not supported in this browser.`);
+        log('immersive-vr is not supported on this device/browser');
+        setStatus(xrStatusEl, 'XR unsupported', 'err');
         return;
       }
-  
-      xrSession = await navigator.xr.requestSession(XR_MODE, {
-        optionalFeatures: ['local-floor', 'bounded-floor']
+
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        log('Bridge is not connected yet; connecting now');
+        connectBridge();
+      }
+
+      xrSession = await navigator.xr.requestSession('immersive-vr', {
+        optionalFeatures: ['local-floor', 'local', 'bounded-floor', 'hand-tracking']
       });
-  
-      const canvas = document.createElement('canvas');
-      gl = canvas.getContext('webgl', { xrCompatible: true, alpha: true });
+
+      canvas.style.display = 'block';
+      canvasPlaceholder.style.display = 'none';
+      gl = canvas.getContext('webgl', { xrCompatible: true, antialias: true, alpha: false });
       await gl.makeXRCompatible();
-  
+
       xrSession.updateRenderState({
-        baseLayer: new XRWebGLLayer(xrSession, gl, { alpha: true })
+        baseLayer: new XRWebGLLayer(xrSession, gl)
       });
-  
-      xrRefSpace = await xrSession.requestReferenceSpace('local-floor');
-      initXRRendering();
-  
+
+      try {
+        xrRefSpace = await xrSession.requestReferenceSpace(refSpaceEl.value);
+      } catch (e) {
+        log(`Failed to request ${refSpaceEl.value}, fallback to local`);
+        xrRefSpace = await xrSession.requestReferenceSpace('local');
+      }
+
       xrSession.addEventListener('end', () => {
         xrSession = null;
         xrRefSpace = null;
-        setPill(xrDot, xrStatus, 'bad', 'XR: ended');
-        sendDebug('xr_end', 'XR session ended on frontend');
+        stopVrBtn.disabled = true;
+        startVrBtn.disabled = false;
+        setStatus(xrStatusEl, 'XR idle', 'idle');
+        canvas.style.display = 'none';
+        canvasPlaceholder.style.display = 'block';
+        log('XR session ended');
       });
-  
-      setPill(xrDot, xrStatus, 'ok', `XR: running (${XR_MODE})`);
-      sendDebug('xr_start', 'XR session started on frontend', { mode: XR_MODE });
-      xrSession.requestAnimationFrame(onXRFrame);
-    }
-  
-    function drawPoint(view, x, y, z, color) {
-      const baseLayer = xrSession.renderState.baseLayer;
-      const viewport = baseLayer.getViewport(view);
-  
-      gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
-      gl.uniformMatrix4fv(uView, false, view.transform.inverse.matrix);
-      gl.uniformMatrix4fv(uProjection, false, view.projectionMatrix);
-      gl.uniformMatrix4fv(uModel, false, makeTranslationMatrix(x, y, z));
-      gl.uniform4f(uColor, color[0], color[1], color[2], color[3]);
-      gl.drawArrays(gl.POINTS, 0, 1);
-    }
-  
-    function onXRFrame(time, frame) {
-      if (!xrSession) return;
-      xrSession.requestAnimationFrame(onXRFrame);
-      frameCounter += 1;
-  
-      const baseLayer = xrSession.renderState.baseLayer;
-      gl.bindFramebuffer(gl.FRAMEBUFFER, baseLayer.framebuffer);
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-      gl.clearColor(0.0, 0.0, 0.0, 0.0);
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  
-      const viewerPose = frame.getViewerPose(xrRefSpace);
-  
-      const controllerSnapshot = {
-        right: null,
-        left: null,
+
+      stopVrBtn.disabled = false;
+      startVrBtn.disabled = true;
+      setStatus(xrStatusEl, 'XR running', 'ok');
+      log('XR session started');
+
+      const onXRFrame = (time, frame) => {
+        const session = frame.session;
+        session.requestAnimationFrame(onXRFrame);
+
+        const pose = frame.getViewerPose(xrRefSpace);
+        if (!pose) return;
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, session.renderState.baseLayer.framebuffer);
+        gl.clearColor(0.02, 0.03, 0.06, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        let left = makeEmptySide('left');
+        let right = makeEmptySide('right');
+
+        for (const inputSource of session.inputSources) {
+          if (inputSource.handedness !== 'left' && inputSource.handedness !== 'right') continue;
+          const side = extractControllerState(inputSource, frame, xrRefSpace);
+          if (inputSource.handedness === 'left') left = side;
+          if (inputSource.handedness === 'right') right = side;
+        }
+
+        renderSide(leftStateEl, left);
+        renderSide(rightStateEl, right);
+        sendControllerState({ left, right });
       };
-  
-      
 
-      let rightPose = null;
-      let leftPose = null;
-  
-      for (const inputSource of xrSession.inputSources) {
-        let pose = null;
-        let usedSpace = null;
-      
-        if (inputSource.gripSpace) {
-          pose = frame.getPose(inputSource.gripSpace, xrRefSpace);
-          usedSpace = 'grip';
-        }
-      
-        if (!pose && inputSource.targetRaySpace) {
-          pose = frame.getPose(inputSource.targetRaySpace, xrRefSpace);
-          usedSpace = 'targetRay';
-        }
-
-        if (!pose) {
-          if (inputSource.handedness === 'right') {
-            sendDebug('pose_missing', 'Pose missing for input source', {
-              handedness: inputSource.handedness,
-              triedGrip: !!inputSource.gripSpace,
-              triedTargetRay: !!inputSource.targetRaySpace,
-              profiles: inputSource.profiles || [],
-            });
-          }
-          continue;
-        }
-        
-        if (!pose) continue;
-      
-        const state = {
-          handedness: inputSource.handedness,
-          pose: {
-            space: usedSpace,
-            position: {
-              x: pose.transform.position.x,
-              y: pose.transform.position.y,
-              z: pose.transform.position.z,
-            },
-            orientation: {
-              x: pose.transform.orientation.x,
-              y: pose.transform.orientation.y,
-              z: pose.transform.orientation.z,
-              w: pose.transform.orientation.w,
-            },
-            matrix: matrixFromTransform(pose.transform),
-          },
-          gamepad: {
-            axes: gamepadAxesToArray(inputSource.gamepad),
-            buttons: gamepadButtonsToObject(inputSource.gamepad),
-          },
-          profiles: inputSource.profiles || [],
-        };
-
-        // sendDebug('input_source_seen', 'XR input source observed', {
-        //   handedness: inputSource.handedness,
-        //   hasGripSpace: !!inputSource.gripSpace,
-        //   hasTargetRaySpace: !!inputSource.targetRaySpace,
-        //   profiles: inputSource.profiles || [],
-        //   gamepadButtons: inputSource.gamepad?.buttons?.length || 0,
-        // });
-        if (inputSource.handedness === 'right') {
-          controllerSnapshot.right = state;
-          rightPose = pose;
-        }
-        if (inputSource.handedness === 'left') {
-          controllerSnapshot.left = state;
-          leftPose = pose;
-        }
-      }
-      
-      lastRightControllerState = controllerSnapshot.right;
-      // Frontend-side B button edge detect: update green reference ball too
-      // const b5PressedNow = !!packet.right?.gamepad?.buttons?.b5?.pressed;
-      // const b5Edge = b5PressedNow && !lastB5Pressed;
-      
-      // if (b5Edge && packet.right?.pose?.matrix) {
-      //   refMatrix = packet.right.pose.matrix.slice();
-      //   refPosition = { ...packet.right.pose.position };
-      //   sendDebug('b5_frontend_ref_update', 'Frontend refMatrix updated by B button', {
-      //     space: packet.right.pose.space
-      //   });
-      // }
-      
-      // lastB5Pressed = b5PressedNow;
-      
-      // let refReadyThisFrame = false;
-      // let refPacketActuallySent = false;
-      
-      // if (pendingSetReference && packet.right?.pose?.matrix) {
-      //   refMatrix = packet.right.pose.matrix.slice();
-      //   refPosition = { ...packet.right.pose.position };
-      //   refReadyThisFrame = true;
-      // }
-
-      if (pendingSetReference && controllerSnapshot.right?.pose?.matrix) {
-        refMatrix = controllerSnapshot.right.pose.matrix.slice();
-        refPosition = { ...controllerSnapshot.right.pose.position };
-        pendingSetReference = false;
-      
-        sendDebug('frontend_ref_set', 'Frontend reference updated from current right pose', {
-          space: controllerSnapshot.right.pose.space,
-          position: refPosition,
-        });
-      
-        setPill(refDot, refStatus, 'ok', 'Reference: set');
-      }
-      if (viewerPose) {
-        gl.useProgram(xrProgram);
-        gl.bindBuffer(gl.ARRAY_BUFFER, xrPointBuffer);
-        gl.enableVertexAttribArray(attribPosition);
-        gl.vertexAttribPointer(attribPosition, 3, gl.FLOAT, false, 0, 0);
-  
-        for (const view of viewerPose.views) {
-          if (rightPose) {
-            const p = rightPose.transform.position;
-            drawPoint(view, p.x, p.y, p.z, [0.20, 0.85, 1.00, 1.0]); // blue
-          }
-  
-          if (leftPose) {
-            const p = leftPose.transform.position;
-            drawPoint(view, p.x, p.y, p.z, [1.00, 0.55, 0.20, 1.0]); // orange
-          }
-  
-          if (refMatrix) {
-            drawPoint(view, refMatrix[12], refMatrix[13], refMatrix[14], [0.30, 1.00, 0.35, 1.0]); // green
-          }
-
-          const wsOpen = !!(ws && ws.readyState === WebSocket.OPEN);
-          const rightTracked = !!controllerSnapshot.right;
-          const refSet = !!refMatrix;
-
-          // Tracking ball:
-          // purple = tracked, dark red = not tracked
-          const trackingColor = rightTracked
-            ? [0.72, 0.38, 1.00, 1.0]   // purple
-            : [0.35, 0.08, 0.08, 1.0];  // dark red
-
-          // Reference ball:
-          // white = set, yellow = pending, dark red = not set
-          let refColor = [0.35, 0.08, 0.08, 1.0]; // dark red default
-          if (refSet) {
-            refColor = [1.00, 1.00, 1.00, 1.0];   // white
-          }
-
-          // WebSocket ball:
-          // pink = connected, dark red = disconnected
-          const wsColor = wsOpen
-            ? [1.00, 0.35, 0.72, 1.0]   // pink
-            : [0.35, 0.08, 0.08, 1.0];  // dark red
-
-          // Draw three HUD balls in a row
-          // x: left->right, y: up, z: forward from head
-          drawHudPoint(view, -0.18,  0.12, -0.45, trackingColor); // left
-          drawHudPoint(view, -0.12,  0.12, -0.45, refColor);      // middle
-          drawHudPoint(view, -0.06,  0.12, -0.45, wsColor);       // right
-        }
-      }
-  
-      const nowMs = performance.now();
-      if (nowMs - lastSentTime >= SEND_INTERVAL_MS) {
-        lastSentTime = nowMs;
-
-        if (!controllerSnapshot.right) {
-          sendDebug('right_not_tracked', 'Right controller not tracked in this XR frame');
-        }
-
-        const controllerPacket = buildSDKStyleControllerPacket(controllerSnapshot);
-        sendPacket(controllerPacket);
-
-        const rp = controllerSnapshot.right?.pose?.position;
-        const rspace = controllerSnapshot.right?.pose?.space || 'none';
-
-        let extraText = '';
-        if (rp && refPosition) {
-          extraText =
-            `\nref.position = (${refPosition.x.toFixed(3)}, ${refPosition.y.toFixed(3)}, ${refPosition.z.toFixed(3)})` +
-            `\ndelta = (${(rp.x - refPosition.x).toFixed(4)}, ${(rp.y - refPosition.y).toFixed(4)}, ${(rp.z - refPosition.z).toFixed(4)})`;
-        }
-
-        const gripActive = getButtonPressed(controllerSnapshot.right, 1);
-        const triggerValue = getButtonValue(controllerSnapshot.right, 0);
-
-        const text = rp
-          ? `VR controller state
-        right.position = (${rp.x.toFixed(3)}, ${rp.y.toFixed(3)}, ${rp.z.toFixed(3)})
-        right.space = ${rspace}
-        right.gripActive = ${gripActive}
-        right.trigger = ${triggerValue.toFixed(3)}
-        resetEvent = ${controllerPacket.resetEvent}
-        gripPressedEdge = ${controllerPacket.gripPressedEdge}
-        gripReleased = ${controllerPacket.gripReleased}
-        triggerPressedEdge = ${controllerPacket.triggerPressedEdge}
-        triggerReleased = ${controllerPacket.triggerReleased}
-        ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}${extraText}`
-          : `VR controller state
-        right controller not tracked
-        resetEvent = ${controllerPacket.resetEvent}
-        ws = ${ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'not connected'}`;
-
-        packetView.textContent = text + '\n\n' + JSON.stringify(controllerPacket, null, 2);
-      }
-  
+      xrSession.requestAnimationFrame(onXRFrame);
     }
-  
-    connectBtn.addEventListener('click', connectWebSocket);
-    enterVrBtn.addEventListener('click', startXR);
-    setRefBtn.addEventListener('click', () => {
-      pendingSetReference = true;
-      sendDebug('set_reference_click', 'Set Reference button armed on frontend');
-      setPill(refDot, refStatus, '', 'Reference: waiting for right pose');
+
+    async function stopXR() {
+      if (xrSession) {
+        await xrSession.end();
+      }
+    }
+
+    connectBridgeBtn.addEventListener('click', connectBridge);
+    startVrBtn.addEventListener('click', () => {
+      startXR().catch((e) => {
+        setStatus(xrStatusEl, 'XR error', 'err');
+        log(`XR start failed: ${e.message}`);
+        console.error(e);
+      });
     });
-  
-    if (!('xr' in navigator)) {
-      setPill(xrDot, xrStatus, 'bad', 'XR: WebXR not available here');
+    stopVrBtn.addEventListener('click', () => {
+      stopXR().catch((e) => {
+        log(`XR stop failed: ${e.message}`);
+        console.error(e);
+      });
+    });
+
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+      log('Warning: WebXR usually requires HTTPS or localhost.');
     }
   </script>
 </body>
